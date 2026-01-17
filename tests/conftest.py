@@ -36,6 +36,19 @@ def test_data_dir(tmp_path: Path) -> Generator[Path, None, None]:
     })
     security_master.write_parquet(security_master_dir / "security_master.parquet")
 
+    # Create calendar master test data (trading days)
+    # Include weekdays from test data range (skip weekends)
+    trading_days = [
+        # Jan 2024 (for daily tests)
+        date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4), date(2024, 1, 5),
+        date(2024, 1, 8), date(2024, 1, 9), date(2024, 1, 10),
+        # Q1-Q2 2024 (for fundamentals/metrics tests) - sample days
+        date(2024, 3, 29), date(2024, 4, 1),
+        date(2024, 6, 28),
+    ]
+    calendar_master = pl.DataFrame({"date": trading_days})
+    calendar_master.write_parquet(security_master_dir / "calendar_master.parquet")
+
     # Create daily ticks test data for AAPL
     daily_ticks_dir = tmp_path / "data" / "raw" / "ticks" / "daily" / "SEC001"
     daily_ticks_dir.mkdir(parents=True)

@@ -1,0 +1,101 @@
+"""Tests for daily data API."""
+
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+from quantdl import QuantDLClient
+from quantdl.exceptions import DataNotFoundError
+
+
+@pytest.fixture
+def client(test_data_dir: Path, temp_cache_dir: str) -> QuantDLClient:
+    """Create client with local test data."""
+    return QuantDLClient(
+        bucket="us-equity-datalake",
+        cache_dir=temp_cache_dir,
+        local_data_path=str(test_data_dir),
+    )
+
+
+class TestDailyAPI:
+    """Tests for client.daily() method."""
+
+    def test_daily_single_symbol(self, client: QuantDLClient) -> None:
+        """Test fetching daily data for single symbol."""
+        df = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+
+        assert "timestamp" in df.columns
+        assert "AAPL" in df.columns
+        assert len(df) > 0
+
+    def test_daily_multiple_symbols(self, client: QuantDLClient) -> None:
+        """Test fetching daily data for multiple symbols."""
+        # Note: Only AAPL has test data in conftest
+        df = client.daily(["AAPL"], "close", "2024-01-01", "2024-01-10")
+
+        assert "timestamp" in df.columns
+        assert "AAPL" in df.columns
+
+    def test_daily_wide_format(self, client: QuantDLClient) -> None:
+        """Test that daily returns wide format."""
+        df = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+
+        # First column is timestamp
+        assert df.columns[0] == "timestamp"
+        # Other columns are symbols
+        assert "AAPL" in df.columns[1:]
+
+    def test_daily_sorted_by_date(self, client: QuantDLClient) -> None:
+        """Test that daily data is sorted by date."""
+        df = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+
+        dates = df["timestamp"].to_list()
+        assert dates == sorted(dates)
+
+    def test_daily_field_options(self, client: QuantDLClient) -> None:
+        """Test different price fields."""
+        for field in ["open", "high", "low", "close", "volume"]:
+            df = client.daily("AAPL", field, "2024-01-01", "2024-01-10")
+            assert len(df) > 0
+
+    def test_daily_invalid_symbol(self, client: QuantDLClient) -> None:
+        """Test fetching data for invalid symbol."""
+        with pytest.raises(DataNotFoundError):
+            client.daily("INVALID_SYMBOL", "close", "2024-01-01", "2024-01-10")
+
+    def test_daily_date_filtering(self, client: QuantDLClient) -> None:
+        """Test date range filtering."""
+        df = client.daily("AAPL", "close", "2024-01-03", "2024-01-05")
+
+        dates = df["timestamp"].to_list()
+        for d in dates:
+            assert d >= date(2024, 1, 3)
+            assert d <= date(2024, 1, 5)
+
+
+class TestDailyCaching:
+    """Tests for daily data caching."""
+
+    def test_daily_uses_cache(self, client: QuantDLClient) -> None:
+        """Test that second request uses cache."""
+        # First request
+        df1 = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+
+        # Check cache stats
+        stats = client.cache_stats()
+        assert stats["entries"] >= 1
+
+        # Second request should use cache
+        df2 = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+
+        assert df1.equals(df2)
+
+    def test_clear_cache(self, client: QuantDLClient) -> None:
+        """Test cache clearing."""
+        client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+
+        client.clear_cache()
+        stats = client.cache_stats()
+        assert stats["entries"] == 0

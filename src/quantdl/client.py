@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
+from quantdl.data.calendar_master import CalendarMaster
 from quantdl.data.security_master import SecurityMaster
 from quantdl.exceptions import DataNotFoundError
 from quantdl.storage.cache import DiskCache
@@ -74,6 +75,7 @@ class QuantDLClient:
         )
 
         self._security_master = SecurityMaster(self._storage, self._cache)
+        self._calendar_master = CalendarMaster(self._storage, self._cache)
         self._max_concurrency = max_concurrency
         self._executor = ThreadPoolExecutor(max_workers=max_concurrency)
 
@@ -81,6 +83,11 @@ class QuantDLClient:
     def security_master(self) -> SecurityMaster:
         """Access security master for direct lookups."""
         return self._security_master
+
+    @property
+    def calendar_master(self) -> CalendarMaster:
+        """Access calendar master for trading day lookups."""
+        return self._calendar_master
 
     def resolve(self, identifier: str, as_of: date | None = None) -> SecurityInfo | None:
         """Resolve symbol/identifier to SecurityInfo.

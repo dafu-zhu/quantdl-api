@@ -19,7 +19,14 @@ Example:
     ```
 """
 
-from quantdl.operators.cross_sectional import demean, rank, scale, zscore
+from quantdl.operators.cross_sectional import (
+    normalize,
+    quantile,
+    rank,
+    scale,
+    winsorize,
+    zscore,
+)
 from quantdl.operators.time_series import (
     ts_delay,
     ts_delta,
@@ -42,6 +49,8 @@ __all__ = [
     # Cross-sectional operators
     "rank",
     "zscore",
-    "demean",
+    "normalize",
     "scale",
+    "quantile",
+    "winsorize",
 ]

@@ -7,7 +7,14 @@
       "Bash(uv run python:*)",
       "Bash(uv pip install:*)",
       "Bash(.venv/Scripts/python:*)",
-      "Bash(.venv/Scripts/pip:*)"
+      "Bash(.venv/Scripts/pip:*)",
+      "Bash(.venvScriptspip.exe install mypy --quiet)",
+      "Bash(python -m pip install:*)",
+      "Bash(python -m mypy:*)",
+      "Bash(python:*)",
+      "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe -m pip install:*)",
+      "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe -m mypy:*)",
+      "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe:*)"
     ]
   }
 }

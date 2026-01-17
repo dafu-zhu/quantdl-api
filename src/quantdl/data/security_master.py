@@ -84,7 +84,8 @@ class SecurityMaster:
         for col in ["symbol", "security_id", "cik", "cusip"]:
             if col not in df.columns:
                 continue
-            result = df.filter(pit_filter & (pl.col(col) == identifier))
+            # Cast column to string for comparison (handles mixed int/string columns)
+            result = df.filter(pit_filter & (pl.col(col).cast(pl.Utf8) == identifier))
             if len(result) > 0:
                 row = result.row(0, named=True)
                 return self._to_security_info(row)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quantdl"
-version = "0.1.0"
+version = "0.1.1"
 description = "Financial data fetcher for alpha research with S3 backend and local caching"
 readme = "README.md"
 license = "MIT"
@@ -94,4 +94,10 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "python-dotenv>=1.2.1",
 ]

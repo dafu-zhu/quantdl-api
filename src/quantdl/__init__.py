@@ -31,7 +31,7 @@ from quantdl.exceptions import (
 )
 from quantdl.types import SecurityInfo
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "QuantDLClient",

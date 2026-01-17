@@ -6,6 +6,8 @@ All operators work row-wise across symbols at each date:
 """
 
 import polars as pl
+import numpy as np
+from scipy import stats
 
 
 def _get_value_cols(df: pl.DataFrame) -> list[str]:
@@ -36,7 +38,6 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
         >>> rank(close, rate=0)  # Precise ranking
         >>> # X = (4,3,6,10,2) => rank(x) = (0.5, 0.25, 0.75, 1.0, 0.0)
     """
-    import numpy as np
 
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
@@ -283,8 +284,6 @@ def quantile(
     Returns:
         Wide DataFrame with quantile-transformed values
     """
-    import numpy as np
-    from scipy import stats
 
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)

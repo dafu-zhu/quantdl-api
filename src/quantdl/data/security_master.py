@@ -1,6 +1,6 @@
 """Security master lookup with point-in-time resolution."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import polars as pl
 
@@ -73,7 +73,7 @@ class SecurityMaster:
             SecurityInfo if found, None otherwise
         """
         df = self._load()
-        as_of = as_of or date.today()
+        as_of = as_of or date.today() - timedelta(days=1)
 
         # Build filter: start_date <= as_of AND (end_date is null OR end_date >= as_of)
         pit_filter = (pl.col("start_date") <= as_of) & (
@@ -144,7 +144,7 @@ class SecurityMaster:
             List of matching SecurityInfo
         """
         df = self._load()
-        as_of = as_of or date.today()
+        as_of = as_of or date.today() - timedelta(days=1)
 
         query_lower = query.lower()
 

@@ -5,8 +5,8 @@ All operators work row-wise across symbols at each date:
 - Operations applied across symbol columns within each row
 """
 
-import polars as pl
 import numpy as np
+import polars as pl
 from scipy import stats
 
 

@@ -1,5 +1,6 @@
 """Tests for alpha operators."""
 
+import math
 from datetime import date
 
 import polars as pl
@@ -250,7 +251,7 @@ class TestCrossSectionalOperators:
         for col in ["AAPL", "MSFT", "GOOGL"]:
             for val in result[col]:
                 if val is not None:
-                    assert not (val != val)  # Check not NaN
+                    assert not math.isnan(val)
 
     def test_quantile_uniform(self, wide_df: pl.DataFrame) -> None:
         """Test quantile transformation with uniform driver."""
@@ -291,8 +292,6 @@ class TestOperatorComposition:
 
     def test_ts_mean_then_rank(self, wide_df: pl.DataFrame) -> None:
         """Test composing time-series and cross-sectional operators."""
-        import math
-
         ma = ts_mean(wide_df, 3)
         ranked = rank(ma)
 

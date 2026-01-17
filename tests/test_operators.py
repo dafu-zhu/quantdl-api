@@ -7,17 +7,36 @@ import polars as pl
 import pytest
 
 from quantdl.operators import (
+    days_from_last_change,
+    hump,
+    kth_element,
+    last_diff_value,
     normalize,
     quantile,
     rank,
     scale,
+    ts_arg_max,
+    ts_arg_min,
+    ts_av_diff,
+    ts_backfill,
+    ts_corr,
+    ts_count_nans,
+    ts_covariance,
+    ts_decay_linear,
     ts_delay,
     ts_delta,
     ts_max,
     ts_mean,
     ts_min,
+    ts_product,
+    ts_quantile,
+    ts_rank,
+    ts_regression,
+    ts_scale,
     ts_std,
+    ts_step,
     ts_sum,
+    ts_zscore,
     winsorize,
     zscore,
 )
@@ -97,6 +116,192 @@ class TestTimeSeriesOperators:
         assert result["AAPL"][0] is None
         # Second value should be first original value
         assert result["AAPL"][1] == 100.0
+
+    def test_ts_product(self, wide_df: pl.DataFrame) -> None:
+        """Test rolling product."""
+        result = ts_product(wide_df, 3)
+        assert result.columns == wide_df.columns
+        # Product of 100, 102, 101
+        expected = 100.0 * 102.0 * 101.0
+        assert abs(result["AAPL"][2] - expected) < 0.01
+
+    def test_ts_count_nans(self) -> None:
+        """Test counting nulls in window."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [100.0, None, 101.0, None, 105.0],
+        })
+        result = ts_count_nans(df, 3)
+        # At idx 2: window [100, None, 101] has 1 null
+        assert result["AAPL"][2] == 1
+        # At idx 3: window [None, 101, None] has 2 nulls
+        assert result["AAPL"][3] == 2
+
+    def test_ts_zscore(self, wide_df: pl.DataFrame) -> None:
+        """Test rolling z-score."""
+        result = ts_zscore(wide_df, 3)
+        assert result.columns == wide_df.columns
+        # Z-score exists for idx >= 2
+        assert result["AAPL"][2] is not None
+        # Z-score should be finite
+        assert not math.isnan(result["AAPL"][2])
+
+    def test_ts_scale(self, wide_df: pl.DataFrame) -> None:
+        """Test rolling min-max scale."""
+        result = ts_scale(wide_df, 3)
+        assert result.columns == wide_df.columns
+        # Values should be in [0, 1] range
+        for i in range(2, len(result)):
+            val = result["AAPL"][i]
+            if val is not None:
+                assert 0.0 <= val <= 1.0
+
+    def test_ts_av_diff(self, wide_df: pl.DataFrame) -> None:
+        """Test difference from rolling mean."""
+        result = ts_av_diff(wide_df, 3)
+        # At idx 2: value=101, mean=(100+102+101)/3=101, diff=0
+        assert abs(result["AAPL"][2]) < 0.01
+
+    def test_ts_step(self, wide_df: pl.DataFrame) -> None:
+        """Test row counter."""
+        result = ts_step(wide_df)
+        assert result["AAPL"][0] == 1
+        assert result["AAPL"][4] == 5
+        assert result["AAPL"][9] == 10
+
+    def test_ts_arg_max(self, wide_df: pl.DataFrame) -> None:
+        """Test index of max in window."""
+        result = ts_arg_max(wide_df, 3)
+        # At idx 2: window [100, 102, 101], max is 102 at idx 1
+        assert result["AAPL"][2] == 1.0
+
+    def test_ts_arg_min(self, wide_df: pl.DataFrame) -> None:
+        """Test index of min in window."""
+        result = ts_arg_min(wide_df, 3)
+        # At idx 2: window [100, 102, 101], min is 100 at idx 0
+        assert result["AAPL"][2] == 0.0
+
+    def test_ts_backfill(self) -> None:
+        """Test forward fill with limit."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [100.0, None, None, None, 105.0],
+        })
+        result = ts_backfill(df, 2)
+        # Should fill first 2 nulls
+        assert result["AAPL"][1] == 100.0
+        assert result["AAPL"][2] == 100.0
+        # Third null exceeds limit, stays null
+        assert result["AAPL"][3] is None
+
+    def test_kth_element(self, wide_df: pl.DataFrame) -> None:
+        """Test k-th element lookback."""
+        result = kth_element(wide_df, 5, 2)
+        # k=2 means 2 periods ago
+        assert result["AAPL"][2] == 100.0
+        assert result["AAPL"][3] == 102.0
+
+    def test_last_diff_value(self) -> None:
+        """Test finding last different value."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [100.0, 100.0, 102.0, 102.0, 102.0],
+        })
+        result = last_diff_value(df, 3)
+        # At idx 4: window [102, 102, 102], current=102, last diff in window is 100 at idx 2
+        # But idx 2 is not in window [2,3,4], so None
+        # Actually at idx 3: window [100, 102, 102], current=102, last diff=100
+        assert result["AAPL"][3] == 100.0
+
+    def test_days_from_last_change(self) -> None:
+        """Test days since value changed."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [100.0, 100.0, 102.0, 102.0, 102.0],
+        })
+        result = days_from_last_change(df)
+        assert result["AAPL"][0] == 0  # First row
+        assert result["AAPL"][1] == 1  # Same as prev
+        assert result["AAPL"][2] == 0  # Changed
+        assert result["AAPL"][3] == 1  # Same as prev
+        assert result["AAPL"][4] == 2  # 2 days since change
+
+    def test_hump(self) -> None:
+        """Test hump limiting change magnitude."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [100.0, 200.0, 150.0],
+            "B": [50.0, 50.0, 50.0],
+        })
+        result = hump(df, hump=0.1)
+        # Row 1: sum(|values|) = 200+50=250, limit=25
+        # A change = 100, capped at prev + 25 = 125
+        assert result["A"][1] == 125.0
+
+    def test_ts_decay_linear(self, wide_df: pl.DataFrame) -> None:
+        """Test linear decay weighted average."""
+        result = ts_decay_linear(wide_df, 3)
+        # Weights [1, 2, 3], sum=6
+        # At idx 2: (100*1 + 102*2 + 101*3) / 6
+        expected = (100 * 1 + 102 * 2 + 101 * 3) / 6
+        assert abs(result["AAPL"][2] - expected) < 0.01
+
+    def test_ts_rank(self, wide_df: pl.DataFrame) -> None:
+        """Test rank of current value in window."""
+        result = ts_rank(wide_df, 3)
+        # At idx 2: window [100, 102, 101], current=101
+        # Sorted: [100, 101, 102], idx=1, rank=1/2=0.5
+        assert abs(result["AAPL"][2] - 0.5) < 0.01
+
+    def test_ts_corr(self, wide_df: pl.DataFrame) -> None:
+        """Test rolling correlation."""
+        # Correlate with itself should give 1.0
+        result = ts_corr(wide_df, wide_df, 3)
+        assert abs(result["AAPL"][2] - 1.0) < 0.01
+
+    def test_ts_covariance(self, wide_df: pl.DataFrame) -> None:
+        """Test rolling covariance."""
+        result = ts_covariance(wide_df, wide_df, 3)
+        # Cov with self = variance
+        assert result["AAPL"][2] is not None
+        assert result["AAPL"][2] > 0
+
+    def test_ts_quantile_gaussian(self, wide_df: pl.DataFrame) -> None:
+        """Test rolling quantile with gaussian transform."""
+        result = ts_quantile(wide_df, 3, driver="gaussian")
+        assert result.columns == wide_df.columns
+        # Should produce finite values
+        for i in range(2, len(result)):
+            val = result["AAPL"][i]
+            if val is not None:
+                assert not math.isinf(val)
+
+    def test_ts_regression_residual(self, wide_df: pl.DataFrame) -> None:
+        """Test regression residual (rettype=0)."""
+        result = ts_regression(wide_df, wide_df, 3, rettype=0)
+        # Regressing on itself gives perfect fit, residual=0
+        for i in range(2, len(result)):
+            val = result["AAPL"][i]
+            if val is not None:
+                assert abs(val) < 0.01
+
+    def test_ts_regression_beta(self, wide_df: pl.DataFrame) -> None:
+        """Test regression beta (rettype=1)."""
+        result = ts_regression(wide_df, wide_df, 3, rettype=1)
+        # Regressing on itself, beta=1
+        for i in range(2, len(result)):
+            val = result["AAPL"][i]
+            if val is not None:
+                assert abs(val - 1.0) < 0.01
+
+    def test_ts_regression_rsquared(self, wide_df: pl.DataFrame) -> None:
+        """Test regression r-squared (rettype=5)."""
+        result = ts_regression(wide_df, wide_df, 3, rettype=5)
+        # Regressing on itself, r-squared=1
+        for i in range(2, len(result)):
+            val = result["AAPL"][i]
+            if val is not None:
+                assert abs(val - 1.0) < 0.01
 
 
 class TestCrossSectionalOperators:

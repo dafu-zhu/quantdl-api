@@ -6,7 +6,8 @@ import polars as pl
 import pytest
 
 from quantdl.operators import (
-    demean,
+    normalize,
+    quantile,
     rank,
     scale,
     ts_delay,
@@ -16,6 +17,7 @@ from quantdl.operators import (
     ts_min,
     ts_std,
     ts_sum,
+    winsorize,
     zscore,
 )
 
@@ -100,24 +102,27 @@ class TestCrossSectionalOperators:
     """Cross-sectional operator tests."""
 
     def test_rank(self, wide_df: pl.DataFrame) -> None:
-        """Test cross-sectional rank."""
-        result = rank(wide_df)
+        """Test cross-sectional rank returns [0,1] floats."""
+        result = rank(wide_df, rate=0)  # Precise ranking
 
         assert result.columns == wide_df.columns
 
-        # At each date, AAPL < GOOGL < MSFT, so ranks should be 1, 2, 3
+        # At each date, AAPL < GOOGL < MSFT, so ranks should be 0.0, 0.5, 1.0
         # Check first row
-        assert result["AAPL"][0] == 1  # Smallest
-        assert result["GOOGL"][0] == 2
-        assert result["MSFT"][0] == 3  # Largest
+        assert result["AAPL"][0] == 0.0  # Smallest
+        assert result["GOOGL"][0] == 0.5
+        assert result["MSFT"][0] == 1.0  # Largest
 
-    def test_rank_descending(self, wide_df: pl.DataFrame) -> None:
-        """Test descending rank."""
-        result = rank(wide_df, ascending=False)
+    def test_rank_approximate(self, wide_df: pl.DataFrame) -> None:
+        """Test approximate ranking with rate>0."""
+        result = rank(wide_df, rate=2)  # Bucket-based ranking
 
-        # Largest gets rank 1
-        assert result["MSFT"][0] == 1
-        assert result["AAPL"][0] == 3
+        assert result.columns == wide_df.columns
+        # Values should be in [0, 1]
+        for col in ["AAPL", "MSFT", "GOOGL"]:
+            for val in result[col]:
+                if val is not None:
+                    assert 0.0 <= val <= 1.0
 
     def test_zscore(self, wide_df: pl.DataFrame) -> None:
         """Test cross-sectional z-score."""
@@ -130,14 +135,33 @@ class TestCrossSectionalOperators:
             row_sum = result["AAPL"][i] + result["MSFT"][i] + result["GOOGL"][i]
             assert abs(row_sum) < 0.01
 
-    def test_demean(self, wide_df: pl.DataFrame) -> None:
-        """Test cross-sectional demean."""
-        result = demean(wide_df)
+    def test_normalize(self, wide_df: pl.DataFrame) -> None:
+        """Test cross-sectional normalize (demean)."""
+        result = normalize(wide_df)
 
-        # Demeaned values should sum to ~0 for each row
+        # Normalized values should sum to ~0 for each row
         for i in range(len(result)):
             row_sum = result["AAPL"][i] + result["MSFT"][i] + result["GOOGL"][i]
             assert abs(row_sum) < 0.01
+
+    def test_normalize_with_std(self, wide_df: pl.DataFrame) -> None:
+        """Test normalize with std division."""
+        result = normalize(wide_df, useStd=True)
+
+        # Should be similar to zscore
+        for i in range(len(result)):
+            row_sum = result["AAPL"][i] + result["MSFT"][i] + result["GOOGL"][i]
+            assert abs(row_sum) < 0.01
+
+    def test_normalize_with_limit(self, wide_df: pl.DataFrame) -> None:
+        """Test normalize with clipping."""
+        result = normalize(wide_df, useStd=True, limit=0.5)
+
+        # Values should be clipped to [-0.5, 0.5]
+        for col in ["AAPL", "MSFT", "GOOGL"]:
+            for val in result[col]:
+                if val is not None:
+                    assert -0.5 <= val <= 0.5
 
     def test_scale(self, wide_df: pl.DataFrame) -> None:
         """Test scaling to target."""
@@ -217,26 +241,72 @@ class TestCrossSectionalOperators:
         assert result["A"][0] == 0.0
         assert result["C"][0] == 0.0
 
+    def test_quantile_gaussian(self, wide_df: pl.DataFrame) -> None:
+        """Test quantile transformation with gaussian driver."""
+        result = quantile(wide_df, driver="gaussian")
+
+        assert result.columns == wide_df.columns
+        # Output should be finite for all non-null values
+        for col in ["AAPL", "MSFT", "GOOGL"]:
+            for val in result[col]:
+                if val is not None:
+                    assert not (val != val)  # Check not NaN
+
+    def test_quantile_uniform(self, wide_df: pl.DataFrame) -> None:
+        """Test quantile transformation with uniform driver."""
+        result = quantile(wide_df, driver="uniform", sigma=2.0)
+
+        assert result.columns == wide_df.columns
+        # Uniform output should be in [-sigma, sigma]
+        for col in ["AAPL", "MSFT", "GOOGL"]:
+            for val in result[col]:
+                if val is not None:
+                    assert -2.0 <= val <= 2.0
+
+    def test_winsorize(self, wide_df: pl.DataFrame) -> None:
+        """Test winsorization."""
+        result = winsorize(wide_df, std=1.0)
+
+        assert result.columns == wide_df.columns
+        # Winsorized values should not have extreme outliers
+        # At least check that values exist
+        assert len(result) == len(wide_df)
+
+    def test_winsorize_with_outliers(self) -> None:
+        """Test winsorization clips outliers."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 1), eager=True),
+            "A": [1.0],
+            "B": [2.0],
+            "C": [100.0],  # Outlier
+        })
+
+        result = winsorize(df, std=1.0)
+        # The outlier should be clipped
+        assert result["C"][0] < 100.0
+
 
 class TestOperatorComposition:
     """Test composing operators."""
 
     def test_ts_mean_then_rank(self, wide_df: pl.DataFrame) -> None:
         """Test composing time-series and cross-sectional operators."""
+        import math
+
         ma = ts_mean(wide_df, 3)
         ranked = rank(ma)
 
         assert ranked.columns == wide_df.columns
-        # First 2 rows have nulls from rolling mean
-        assert ranked["AAPL"][0] is None
-        assert ranked["AAPL"][1] is None
+        # First 2 rows have nulls from rolling mean, rank returns NaN
+        assert ranked["AAPL"][0] is None or math.isnan(ranked["AAPL"][0])
+        assert ranked["AAPL"][1] is None or math.isnan(ranked["AAPL"][1])
 
-    def test_demean_then_scale(self, wide_df: pl.DataFrame) -> None:
+    def test_normalize_then_scale(self, wide_df: pl.DataFrame) -> None:
         """Test composing cross-sectional operators."""
-        demeaned = demean(wide_df)
-        scaled = scale(demeaned, scale=1.0)
+        normalized = normalize(wide_df)
+        scaled = scale(normalized, scale=1.0)
 
-        # Should still sum to ~0 (demean preserved)
+        # Should still sum to ~0 (normalize preserved)
         # But absolute sum should be ~1 (scale)
         for i in range(len(scaled)):
             row_sum = scaled["AAPL"][i] + scaled["MSFT"][i] + scaled["GOOGL"][i]

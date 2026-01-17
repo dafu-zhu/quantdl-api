@@ -78,7 +78,7 @@ warn_unused_configs = true
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["moto", "boto3", "botocore"]
+module = ["moto", "boto3", "botocore", "scipy", "scipy.stats"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

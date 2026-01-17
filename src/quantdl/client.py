@@ -114,6 +114,12 @@ class QuantDLClient:
                 result.append((sym, info))
         return result
 
+    def _align_to_calendar(self, wide: pl.DataFrame, start: date, end: date) -> pl.DataFrame:
+        """Align wide table rows to trading calendar."""
+        trading_days = self._calendar_master.get_trading_days(start, end)
+        calendar_df = pl.DataFrame({"timestamp": trading_days})
+        return calendar_df.join(wide, on="timestamp", how="left").sort("timestamp")
+
     def _fetch_daily_single(
         self,
         security_id: str,
@@ -241,8 +247,8 @@ class QuantDLClient:
         combined = pl.concat(dfs)
         wide = combined.pivot(values="value", index="timestamp", on="symbol")
 
-        # Sort by date
-        return wide.sort("timestamp")
+        # Align to trading calendar
+        return self._align_to_calendar(wide, start, end)
 
     def _fetch_fundamentals_single(
         self,
@@ -355,7 +361,7 @@ class QuantDLClient:
 
         combined = pl.concat(dfs)
         wide = combined.pivot(values="value", index="timestamp", on="symbol")
-        return wide.sort("timestamp")
+        return self._align_to_calendar(wide, start, end)
 
     def _fetch_metrics_single(
         self,
@@ -466,7 +472,7 @@ class QuantDLClient:
 
         combined = pl.concat(dfs)
         wide = combined.pivot(values="value", index="timestamp", on="symbol")
-        return wide.sort("timestamp")
+        return self._align_to_calendar(wide, start, end)
 
     def universe(self, name: str = "top3000") -> list[str]:
         """Load universe of symbols.

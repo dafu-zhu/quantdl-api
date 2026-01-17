@@ -58,6 +58,15 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
         )
     else:
         # Bucket-based approximate ranking
+        # Logic:
+        # 1. Sample M random pivots from N values (M ≈ N/2^rate)
+        # 2. Sort only the sampled pivots to get bucket thresholds
+        # 3. Assign each value to bucket via binary search O(log M)
+        # 4. Normalize bucket index to [0, 1]
+        # Total: O(M log M + N log M) vs O(N log N) for full sort
+        # Random sampling gives unbiased quantile estimates
+        rng = np.random.default_rng(seed=42)  # Fixed seed for reproducibility
+
         def bucket_rank(values: np.ndarray, rate: int) -> np.ndarray:
             """Compute approximate rank using bucket-based method."""
             valid_mask = ~np.isnan(values)
@@ -73,9 +82,9 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
 
             valid_vals = values[valid_mask]
 
-            # Sample pivots and build bucket thresholds
+            # Random sample for pivot selection (unbiased quantile estimation)
             sample_size = min(n_buckets, n_valid)
-            sample_idx = np.linspace(0, n_valid - 1, sample_size, dtype=int)
+            sample_idx = rng.choice(n_valid, size=sample_size, replace=False)
             sorted_sample = np.sort(valid_vals[sample_idx])
             thresholds = sorted_sample
 

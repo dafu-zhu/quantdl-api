@@ -19,8 +19,8 @@ Example:
     ```
 """
 
-from quantdl.operators.crosssectional import demean, rank, scale, zscore
-from quantdl.operators.timeseries import (
+from quantdl.operators.cross_sectional import demean, rank, scale, zscore
+from quantdl.operators.time_series import (
     ts_delay,
     ts_delta,
     ts_max,

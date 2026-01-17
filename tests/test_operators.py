@@ -141,12 +141,81 @@ class TestCrossSectionalOperators:
 
     def test_scale(self, wide_df: pl.DataFrame) -> None:
         """Test scaling to target."""
-        result = scale(wide_df, target=1.0)
+        result = scale(wide_df, scale=1.0)
 
         # Sum of absolute values should be ~1.0 for each row
         for i in range(len(result)):
             abs_sum = abs(result["AAPL"][i]) + abs(result["MSFT"][i]) + abs(result["GOOGL"][i])
             assert abs(abs_sum - 1.0) < 0.01
+
+    def test_scale_custom_booksize(self, wide_df: pl.DataFrame) -> None:
+        """Test scaling to custom book size."""
+        result = scale(wide_df, scale=4.0)
+
+        # Sum of absolute values should be ~4.0 for each row
+        for i in range(len(result)):
+            abs_sum = abs(result["AAPL"][i]) + abs(result["MSFT"][i]) + abs(result["GOOGL"][i])
+            assert abs(abs_sum - 4.0) < 0.01
+
+    def test_scale_longscale_shortscale(self) -> None:
+        """Test asymmetric long/short scaling."""
+        # Create data with both positive and negative values
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, -5.0, 20.0],
+            "B": [-20.0, 15.0, -10.0],
+            "C": [5.0, -10.0, 30.0],
+        })
+
+        result = scale(df, longscale=4.0, shortscale=3.0)
+
+        # Check row 0: longs = [10, 5] = 15, shorts = [|-20|] = 20
+        # After scaling: longs sum to 4, shorts sum to 3
+        row0_long_sum = max(0, result["A"][0]) + max(0, result["C"][0])
+        row0_short_sum = abs(min(0, result["B"][0]))
+        assert abs(row0_long_sum - 4.0) < 0.01
+        assert abs(row0_short_sum - 3.0) < 0.01
+
+        # Check row 1: longs = [15] = 15, shorts = [|-5|, |-10|] = 15
+        row1_long_sum = max(0, result["B"][1])
+        row1_short_sum = abs(min(0, result["A"][1])) + abs(min(0, result["C"][1]))
+        assert abs(row1_long_sum - 4.0) < 0.01
+        assert abs(row1_short_sum - 3.0) < 0.01
+
+    def test_scale_only_longscale(self) -> None:
+        """Test scaling only long positions."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
+            "A": [10.0, -5.0],
+            "B": [-20.0, 15.0],
+            "C": [5.0, -10.0],
+        })
+
+        result = scale(df, longscale=2.0, shortscale=0.0)
+
+        # Row 0: longs = [10, 5] = 15, should sum to 2
+        row0_long_sum = max(0, result["A"][0]) + max(0, result["C"][0])
+        assert abs(row0_long_sum - 2.0) < 0.01
+        # Shorts should be 0 (shortscale=0)
+        assert result["B"][0] == 0.0
+
+    def test_scale_only_shortscale(self) -> None:
+        """Test scaling only short positions."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
+            "A": [10.0, -5.0],
+            "B": [-20.0, 15.0],
+            "C": [5.0, -10.0],
+        })
+
+        result = scale(df, longscale=0.0, shortscale=3.0)
+
+        # Row 0: shorts = [|-20|] = 20, should sum to 3
+        row0_short_sum = abs(min(0, result["B"][0]))
+        assert abs(row0_short_sum - 3.0) < 0.01
+        # Longs should be 0 (longscale=0)
+        assert result["A"][0] == 0.0
+        assert result["C"][0] == 0.0
 
 
 class TestOperatorComposition:
@@ -165,7 +234,7 @@ class TestOperatorComposition:
     def test_demean_then_scale(self, wide_df: pl.DataFrame) -> None:
         """Test composing cross-sectional operators."""
         demeaned = demean(wide_df)
-        scaled = scale(demeaned, target=1.0)
+        scaled = scale(demeaned, scale=1.0)
 
         # Should still sum to ~0 (demean preserved)
         # But absolute sum should be ~1 (scale)

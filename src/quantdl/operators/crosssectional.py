@@ -96,24 +96,74 @@ def demean(x: pl.DataFrame) -> pl.DataFrame:
     ])
 
 
-def scale(x: pl.DataFrame, target: float = 1.0) -> pl.DataFrame:
-    """Scale values so that sum of absolute values equals target.
+def scale(
+    x: pl.DataFrame,
+    scale: float = 1.0,
+    longscale: float = 0.0,
+    shortscale: float = 0.0,
+) -> pl.DataFrame:
+    """Scale values so that sum of absolute values equals target book size.
 
-    Useful for creating dollar-neutral portfolios.
+    Scales the input to the book size. The default scales so that sum(abs(x))
+    equals 1. Use `scale` parameter to set a different book size.
+
+    For separate long/short scaling, use `longscale` and `shortscale` parameters
+    to scale positive and negative positions independently.
+
+    This operator may help reduce outliers.
 
     Args:
         x: Wide DataFrame with date + symbol columns
-        target: Target sum of absolute values (default: 1.0)
+        scale: Target sum of absolute values (default: 1.0). When longscale or
+            shortscale are specified, this is ignored.
+        longscale: Target sum of positive values (default: 0.0, meaning no scaling).
+            When > 0, positive values are scaled so their sum equals this value.
+        shortscale: Target sum of absolute negative values (default: 0.0, meaning
+            no scaling). When > 0, negative values are scaled so sum(abs(neg)) equals
+            this value.
 
     Returns:
         Wide DataFrame with scaled values
+
+    Examples:
+        >>> scale(returns, scale=4)  # Scale to book size 4
+        >>> scale(returns, scale=1) + scale(close, scale=20)  # Combine scaled alphas
+        >>> scale(returns, longscale=4, shortscale=3)  # Asymmetric long/short scaling
     """
     value_cols = _get_value_cols(x)
 
-    # Sum of absolute values across row
-    abs_sum = pl.sum_horizontal(*[pl.col(c).abs() for c in value_cols])
+    # Check if using long/short scaling
+    use_asymmetric = longscale > 0 or shortscale > 0
 
-    return x.with_columns([
-        (pl.col(c) * target / abs_sum).alias(c)
-        for c in value_cols
-    ])
+    if use_asymmetric:
+        # Scale long and short positions separately
+        # Sum of positive values across row
+        long_sum = pl.sum_horizontal(
+            *[pl.when(pl.col(c) > 0).then(pl.col(c)).otherwise(0.0) for c in value_cols]
+        )
+        # Sum of absolute negative values across row
+        short_sum = pl.sum_horizontal(
+            *[pl.when(pl.col(c) < 0).then(-pl.col(c)).otherwise(0.0) for c in value_cols]
+        )
+
+        # Scale factors (avoid division by zero)
+        long_factor = pl.when(long_sum > 0).then(longscale / long_sum).otherwise(0.0)
+        short_factor = pl.when(short_sum > 0).then(shortscale / short_sum).otherwise(0.0)
+
+        return x.with_columns([
+            pl.when(pl.col(c) > 0)
+            .then(pl.col(c) * long_factor)
+            .when(pl.col(c) < 0)
+            .then(pl.col(c) * short_factor)
+            .otherwise(0.0)
+            .alias(c)
+            for c in value_cols
+        ])
+    else:
+        # Standard scaling: sum of absolute values equals scale
+        abs_sum = pl.sum_horizontal(*[pl.col(c).abs() for c in value_cols])
+
+        return x.with_columns([
+            (pl.col(c) * scale / abs_sum).alias(c)
+            for c in value_cols
+        ])

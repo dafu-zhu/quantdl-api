@@ -270,7 +270,7 @@ def ts_backfill(x: pl.DataFrame, d: int) -> pl.DataFrame:
     )
 
 
-def kth_element(x: pl.DataFrame, d: int, k: int) -> pl.DataFrame:
+def kth_element(x: pl.DataFrame, d: int, k: int) -> pl.DataFrame:  # noqa: ARG001
     """Get k-th element in lookback window (k=0 is current, k=1 is prev, etc)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
@@ -380,7 +380,7 @@ def ts_decay_linear(x: pl.DataFrame, d: int, dense: bool = False) -> pl.DataFram
         if dense:
             # Only use non-null values
             valid: list[tuple[int, float]] = [
-                (w, v) for w, v in zip(weights, vals) if v is not None
+                (w, v) for w, v in zip(weights, vals, strict=True) if v is not None
             ]
             if not valid:
                 return None
@@ -389,7 +389,7 @@ def ts_decay_linear(x: pl.DataFrame, d: int, dense: bool = False) -> pl.DataFram
         else:
             if any(v is None for v in vals):
                 return None
-            return float(sum(w * v for w, v in zip(weights, vals)) / weight_sum)
+            return float(sum(w * v for w, v in zip(weights, vals, strict=True)) / weight_sum)
 
     return x.select(
         pl.col(date_col),
@@ -445,7 +445,7 @@ def ts_corr(x: pl.DataFrame, y: pl.DataFrame, d: int) -> pl.DataFrame:
                 else:
                     x_mean = sum(x_win) / d
                     y_mean = sum(y_win) / d
-                    cov = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x_win, y_win)) / d
+                    cov = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x_win, y_win, strict=True)) / d
                     x_std = (sum((xv - x_mean) ** 2 for xv in x_win) / d) ** 0.5
                     y_std = (sum((yv - y_mean) ** 2 for yv in y_win) / d) ** 0.5
                     if x_std == 0 or y_std == 0:
@@ -478,7 +478,7 @@ def ts_covariance(x: pl.DataFrame, y: pl.DataFrame, d: int) -> pl.DataFrame:
                 else:
                     x_mean = sum(x_win) / d
                     y_mean = sum(y_win) / d
-                    cov = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x_win, y_win)) / d
+                    cov = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x_win, y_win, strict=True)) / d
                     covs.append(cov)
         result_data[c] = covs
 
@@ -623,7 +623,7 @@ def ts_regression(
 
             ss_xx = sum((xv - x_mean) ** 2 for xv in x_win)
             ss_yy = sum((yv - y_mean) ** 2 for yv in y_win)
-            ss_xy = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x_win, y_win))
+            ss_xy = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x_win, y_win, strict=True))
 
             if ss_xx == 0:
                 results.append(None)
@@ -632,7 +632,7 @@ def ts_regression(
             beta = ss_xy / ss_xx
             alpha = y_mean - beta * x_mean
             y_pred = [alpha + beta * xv for xv in x_win]
-            residuals = [yv - yp for yv, yp in zip(y_win, y_pred)]
+            residuals = [yv - yp for yv, yp in zip(y_win, y_pred, strict=True)]
             ss_res = sum(r**2 for r in residuals)
 
             if rettype == 0:  # residual

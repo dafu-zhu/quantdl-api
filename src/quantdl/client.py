@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -214,7 +214,7 @@ class QuantDLClient:
             end = date.fromisoformat(end)
 
         start = start or date(2000, 1, 1)
-        end = end or date.today()
+        end = end or date.today() - timedelta(days=1)
 
         # Resolve symbols to security IDs
         resolved = self._resolve_securities(symbols, as_of=start)
@@ -332,7 +332,7 @@ class QuantDLClient:
             end = date.fromisoformat(end)
 
         start = start or date(2000, 1, 1)
-        end = end or date.today()
+        end = end or date.today() - timedelta(days=1)
 
         resolved = self._resolve_securities(symbols, as_of=start)
         if not resolved:
@@ -444,7 +444,7 @@ class QuantDLClient:
             end = date.fromisoformat(end)
 
         start = start or date(2000, 1, 1)
-        end = end or date.today()
+        end = end or date.today() - timedelta(days=1)
 
         resolved = self._resolve_securities(symbols, as_of=start)
         if not resolved:

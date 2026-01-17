@@ -1,11 +1,14 @@
 """Tests for DiskCache."""
 
+import json
 import threading
 import time
+from pathlib import Path
 
 import polars as pl
 import pytest
 
+from quantdl.exceptions import CacheError
 from quantdl.storage.cache import DiskCache
 
 
@@ -191,3 +194,83 @@ class TestCacheThreadSafety:
             t.join()
 
         assert len(errors) == 0
+
+
+class TestCacheEdgeCases:
+    """Edge case tests for cache."""
+
+    def test_load_corrupted_metadata(self, temp_cache_dir: str) -> None:
+        """Test loading corrupted metadata resets cache."""
+        # Create cache directory and write corrupted metadata
+        cache_dir = Path(temp_cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        metadata_path = cache_dir / "metadata.json"
+        metadata_path.write_text("{ invalid json }")
+
+        # Should raise CacheError but reset metadata
+        with pytest.raises(CacheError):
+            DiskCache(cache_dir=temp_cache_dir)
+
+        # Verify metadata was reset
+        assert metadata_path.exists()
+        with open(metadata_path) as f:
+            data = json.load(f)
+        assert data == {}
+
+    def test_get_externally_deleted_file(
+        self, temp_cache_dir: str, sample_df: pl.DataFrame
+    ) -> None:
+        """Test get when parquet file was externally deleted."""
+        cache = DiskCache(cache_dir=temp_cache_dir, ttl_seconds=3600)
+        cache.put("test/path.parquet", sample_df)
+
+        # Externally delete the parquet file
+        data_dir = Path(temp_cache_dir) / "data"
+        for f in data_dir.glob("*.parquet"):
+            f.unlink()
+
+        # Get should return None and clean up metadata
+        result = cache.get("test/path.parquet")
+        assert result is None
+
+    def test_get_corrupted_parquet(self, temp_cache_dir: str, sample_df: pl.DataFrame) -> None:
+        """Test get when parquet file is corrupted."""
+        cache = DiskCache(cache_dir=temp_cache_dir, ttl_seconds=3600)
+        cache.put("test/path.parquet", sample_df)
+
+        # Corrupt the parquet file
+        data_dir = Path(temp_cache_dir) / "data"
+        for f in data_dir.glob("*.parquet"):
+            f.write_text("corrupted data")
+
+        # Get should return None and remove from cache
+        result = cache.get("test/path.parquet")
+        assert result is None
+
+        # Entry should be removed from cache
+        assert cache.stats()["entries"] == 0
+
+    def test_lru_eviction_file_missing(self, temp_cache_dir: str) -> None:
+        """Test LRU eviction handles missing files gracefully."""
+        cache = DiskCache(cache_dir=temp_cache_dir, max_size_bytes=1000)
+
+        # Add entries
+        df1 = pl.DataFrame({"a": list(range(50))})
+        df2 = pl.DataFrame({"a": list(range(50))})
+        cache.put("path1.parquet", df1)
+        time.sleep(0.1)
+        cache.put("path2.parquet", df2)
+
+        # Externally delete path1's file
+        data_dir = Path(temp_cache_dir) / "data"
+        for f in data_dir.glob("*.parquet"):
+            f.unlink()
+            break  # Only delete first file
+
+        # Adding another entry should trigger eviction without error
+        df3 = pl.DataFrame({"a": list(range(50))})
+        cache.put("path3.parquet", df3)
+
+        # Should not raise, path3 should exist
+        result = cache.get("path3.parquet")
+        assert result is not None

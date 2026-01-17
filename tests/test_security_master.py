@@ -63,6 +63,39 @@ class TestResolve:
         assert info_after.symbol == "GOOGL"
 
 
+class TestGetBySecurityId:
+    """Tests for get_by_security_id method."""
+
+    def test_get_by_security_id(self, security_master: SecurityMaster) -> None:
+        """Test getting security by security_id."""
+        info = security_master.get_by_security_id("SEC001")
+        assert info is not None
+        assert info.security_id == "SEC001"
+        assert info.symbol == "AAPL"
+
+    def test_get_by_security_id_not_found(self, security_master: SecurityMaster) -> None:
+        """Test getting nonexistent security_id."""
+        info = security_master.get_by_security_id("NONEXISTENT")
+        assert info is None
+
+
+class TestResolveByPermno:
+    """Tests for resolving by permno."""
+
+    def test_resolve_by_permno(self, security_master: SecurityMaster) -> None:
+        """Test resolving by permno (integer identifier)."""
+        # AAPL has permno 10001 in test data
+        info = security_master.resolve("10001")
+        assert info is not None
+        assert info.symbol == "AAPL"
+        assert info.permno == 10001
+
+    def test_resolve_by_permno_not_found(self, security_master: SecurityMaster) -> None:
+        """Test resolving nonexistent permno."""
+        info = security_master.resolve("99999")
+        assert info is None
+
+
 class TestBatchResolve:
     """Batch resolution tests."""
 

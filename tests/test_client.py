@@ -103,3 +103,33 @@ class TestMetrics:
         """Test metrics with invalid symbol."""
         with pytest.raises(DataNotFoundError):
             client.metrics("INVALID", "pe_ratio", "2024-01-01", "2024-12-31")
+
+
+class TestDailyFieldNotFound:
+    """Tests for daily field not found error."""
+
+    def test_daily_field_not_found(self, client: QuantDLClient) -> None:
+        """Test daily with invalid field raises DataNotFoundError."""
+        with pytest.raises(DataNotFoundError) as exc_info:
+            client.daily("AAPL", field="nonexistent_field", start="2024-01-01", end="2024-01-10")
+        assert "field=nonexistent_field" in str(exc_info.value)
+
+
+class TestFundamentalsConceptNotFound:
+    """Tests for fundamentals concept not found error."""
+
+    def test_fundamentals_concept_not_found(self, client: QuantDLClient) -> None:
+        """Test fundamentals with invalid concept raises DataNotFoundError."""
+        with pytest.raises(DataNotFoundError) as exc_info:
+            client.fundamentals("AAPL", concept="NonexistentConcept", start="2024-01-01", end="2024-12-31")
+        assert "concept=NonexistentConcept" in str(exc_info.value)
+
+
+class TestMetricsFieldNotFound:
+    """Tests for metrics field not found error."""
+
+    def test_metrics_field_not_found(self, client: QuantDLClient) -> None:
+        """Test metrics with invalid metric raises DataNotFoundError."""
+        with pytest.raises(DataNotFoundError) as exc_info:
+            client.metrics("AAPL", metric="nonexistent_metric", start="2024-01-01", end="2024-12-31")
+        assert "metric=nonexistent_metric" in str(exc_info.value)

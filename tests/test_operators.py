@@ -517,6 +517,289 @@ class TestOperatorComposition:
             assert abs(row_sum) < 0.01
 
 
+class TestTsRegressionRetTypes:
+    """Tests for ts_regression rettype parameter."""
+
+    @pytest.fixture
+    def regression_data(self) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """Create y and x DataFrames for regression tests."""
+        # y = 2*x + 1 + noise
+        x_vals = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+        y_vals = [3.1, 5.0, 7.2, 8.9, 11.1, 13.0, 14.8, 17.1, 19.0, 21.0]
+        y = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 10), eager=True),
+            "A": y_vals,
+        })
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 10), eager=True),
+            "A": x_vals,
+        })
+        return y, x
+
+    def test_ts_regression_alpha(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression alpha (intercept) rettype=2."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=2)
+        # Alpha should be ~1 for y=2x+1
+        assert result["A"][4] is not None
+        assert abs(result["A"][4] - 1.0) < 1.0  # Allow tolerance
+
+    def test_ts_regression_predicted(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression predicted rettype=3."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=3)
+        # Predicted values should exist
+        assert result["A"][4] is not None
+
+    def test_ts_regression_correlation(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression correlation rettype=4."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=4)
+        # Correlation should be close to 1 for linear relationship
+        assert result["A"][4] is not None
+        assert result["A"][4] > 0.9
+
+    def test_ts_regression_tstat_beta(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression t-stat for beta rettype=6."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=6)
+        # t-stat should be large for significant relationship
+        assert result["A"][4] is not None
+        assert abs(result["A"][4]) > 2.0
+
+    def test_ts_regression_tstat_alpha(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression t-stat for alpha rettype=7."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=7)
+        assert result["A"][4] is not None
+
+    def test_ts_regression_stderr_beta(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression std error of beta rettype=8."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=8)
+        # Std error should be small for good fit
+        assert result["A"][4] is not None
+        assert result["A"][4] > 0
+
+    def test_ts_regression_stderr_alpha(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test regression std error of alpha rettype=9."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=9)
+        assert result["A"][4] is not None
+        assert result["A"][4] > 0
+
+    def test_ts_regression_invalid_rettype(self, regression_data: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test invalid rettype returns None."""
+        y, x = regression_data
+        result = ts_regression(y, x, 5, rettype=99)
+        # Invalid rettype should give None
+        assert result["A"][4] is None
+
+    def test_ts_regression_with_nulls(self) -> None:
+        """Test regression with null values."""
+        y = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, None, 3.0, 4.0, 5.0],
+        })
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 2.0, 3.0, 4.0, 5.0],
+        })
+        result = ts_regression(y, x, 3, rettype=1)
+        # Window with null should return None
+        assert result["A"][2] is None
+
+    def test_ts_regression_zero_variance(self) -> None:
+        """Test regression with zero variance in x (ss_xx=0)."""
+        y = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 2.0, 3.0, 4.0, 5.0],
+        })
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [5.0, 5.0, 5.0, 5.0, 5.0],  # Constant x
+        })
+        result = ts_regression(y, x, 3, rettype=1)
+        # Zero variance should return None
+        assert result["A"][2] is None
+
+
+class TestTsQuantileEdgeCases:
+    """Tests for ts_quantile edge cases."""
+
+    def test_ts_quantile_uniform(self) -> None:
+        """Test ts_quantile with uniform driver."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 2.0, 3.0, 4.0, 5.0],
+        })
+        result = ts_quantile(df, 3, driver="uniform")
+        # Uniform output should be in [-1, 1]
+        for i in range(2, len(result)):
+            val = result["A"][i]
+            if val is not None:
+                assert -1.0 <= val <= 1.0
+
+    def test_ts_quantile_single_unique_value(self) -> None:
+        """Test ts_quantile with single unique value in window."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [5.0, 5.0, 5.0, 5.0, 5.0],
+        })
+        result = ts_quantile(df, 3, driver="gaussian")
+        # All same values: idx=0, rank_pct=0.5/3, inv_norm(0.166) ~ -0.97
+        assert result["A"][2] is not None
+        assert not math.isnan(result["A"][2])
+
+    def test_ts_quantile_with_nulls(self) -> None:
+        """Test ts_quantile with null values."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, None, 3.0, 4.0, 5.0],
+        })
+        result = ts_quantile(df, 3, driver="gaussian")
+        # Should handle nulls gracefully
+        assert result is not None
+
+
+class TestTsCorrCovarianceEdgeCases:
+    """Tests for ts_corr and ts_covariance edge cases."""
+
+    def test_ts_corr_with_nulls(self) -> None:
+        """Test ts_corr with null values."""
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, None, 3.0, 4.0, 5.0],
+        })
+        y = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [2.0, 4.0, 6.0, 8.0, 10.0],
+        })
+        result = ts_corr(x, y, 3)
+        # Window with null should return None
+        assert result["A"][2] is None
+
+    def test_ts_corr_zero_std(self) -> None:
+        """Test ts_corr with zero standard deviation."""
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [5.0, 5.0, 5.0, 5.0, 5.0],  # Constant
+        })
+        y = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 2.0, 3.0, 4.0, 5.0],
+        })
+        result = ts_corr(x, y, 3)
+        # Zero std should return None
+        assert result["A"][2] is None
+
+    def test_ts_covariance_with_nulls(self) -> None:
+        """Test ts_covariance with null values."""
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 2.0, None, 4.0, 5.0],
+        })
+        y = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [2.0, 4.0, 6.0, 8.0, 10.0],
+        })
+        result = ts_covariance(x, y, 3)
+        # Window with null should return None
+        assert result["A"][3] is None
+
+
+class TestTsRankEdgeCases:
+    """Tests for ts_rank edge cases."""
+
+    def test_ts_rank_with_nulls(self) -> None:
+        """Test ts_rank with null current value."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 2.0, None, 4.0, 5.0],
+        })
+        result = ts_rank(df, 3)
+        # Null current value should return None
+        assert result["A"][2] is None
+
+    def test_ts_rank_single_unique(self) -> None:
+        """Test ts_rank with single unique non-null value."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [5.0, 5.0, 5.0, 5.0, 5.0],
+        })
+        result = ts_rank(df, 3)
+        # All same values: current is at idx 0, len=3, rank=0/(3-1)=0
+        assert result["A"][2] == 0.0
+
+
+class TestTsDecayLinearEdgeCases:
+    """Tests for ts_decay_linear edge cases."""
+
+    def test_ts_decay_linear_dense_true(self) -> None:
+        """Test ts_decay_linear with dense=True (skip nulls)."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, None, 3.0, 4.0, 5.0],
+        })
+        result = ts_decay_linear(df, 3, dense=True)
+        # Dense mode skips nulls, should return value
+        assert result["A"][4] is not None
+
+    def test_ts_decay_linear_with_nulls_dense_false(self) -> None:
+        """Test ts_decay_linear with nulls and dense=False."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, None, 3.0, 4.0, 5.0],
+        })
+        result = ts_decay_linear(df, 3, dense=False)
+        # Non-dense mode: window with null returns None
+        assert result["A"][2] is None
+
+
+class TestOtherOperatorEdgeCases:
+    """Tests for other operator edge cases."""
+
+    def test_hump_with_none(self) -> None:
+        """Test hump when previous value is None."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [None, 100.0, 150.0],
+        })
+        result = hump(df, hump=0.1)
+        # When prev is None, curr should pass through
+        assert result["A"][1] == 100.0
+
+    def test_last_diff_value_all_same(self) -> None:
+        """Test last_diff_value when all values are same."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [5.0, 5.0, 5.0, 5.0, 5.0],
+        })
+        result = last_diff_value(df, 3)
+        # No different value exists, should return None
+        assert result["A"][4] is None
+
+    def test_ts_arg_max_short_window(self) -> None:
+        """Test ts_arg_max when window not filled."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [1.0, 2.0, 3.0],
+        })
+        result = ts_arg_max(df, 5)
+        # Window size 5, only 3 values, should be None
+        assert result["A"][2] is None
+
+    def test_ts_arg_min_short_window(self) -> None:
+        """Test ts_arg_min when window not filled."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [3.0, 2.0, 1.0],
+        })
+        result = ts_arg_min(df, 5)
+        # Window size 5, only 3 values, should be None
+        assert result["A"][2] is None
+
+
 class TestEdgeCases:
     """Edge case tests."""
 

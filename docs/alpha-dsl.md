@@ -4,12 +4,13 @@ Domain-specific language for composing alpha expressions with operator overloadi
 
 ## Overview
 
-The Alpha DSL provides two ways to build alpha expressions:
+The Alpha DSL provides three ways to build alpha expressions:
 
-1. **Alpha class** - Python operator overloading (`+`, `-`, `*`, `/`, `<`, `>`, etc.)
-2. **alpha_eval()** - String-based DSL for dynamic expressions
+1. **AlphaSession** - Unified session with automatic data fetching (recommended)
+2. **Alpha class** - Python operator overloading (`+`, `-`, `*`, `/`, `<`, `>`, etc.)
+3. **alpha_eval()** - String-based DSL for dynamic expressions
 
-Both work on **wide DataFrames**: first column is date, remaining columns are symbols.
+All work on **wide DataFrames**: first column is date, remaining columns are symbols.
 
 ```
 timestamp   | AAPL  | MSFT  | GOOGL
@@ -20,8 +21,90 @@ timestamp   | AAPL  | MSFT  | GOOGL
 ## Installation
 
 ```python
-from quantdl.alpha import Alpha, alpha_eval
+from quantdl.alpha import Alpha, AlphaSession, alpha_eval
 import quantdl.operators as ops
+```
+
+## AlphaSession (Recommended)
+
+AlphaSession provides unified access to S3 data with automatic fetching, caching, and operator integration.
+
+### Basic Usage
+
+```python
+with AlphaSession(client, ["AAPL", "MSFT", "GOOGL"], "2024-01-01", "2024-12-31") as s:
+    close = s.close    # Lazy fetch, returns Alpha
+    volume = s.volume  # Cached on first access
+
+    # Alpha arithmetic works directly
+    returns = close / Alpha(ops.ts_delay(close.data, 1)) - 1
+    signal = returns * volume
+
+    # Use .data for operators
+    ranked = ops.rank(-ops.ts_delta(close.data, 5))
+```
+
+### Available Fields
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| `close`, `open`, `high`, `low`, `volume` | daily | OHLCV data |
+| `price` | daily | Alias for close |
+| `revenue`, `net_income` | fundamentals | SEC filings |
+| `pe`, `pb` | metrics | Valuation ratios |
+
+### String DSL with Session
+
+```python
+with AlphaSession(client, symbols, start, end) as s:
+    alpha = s.eval("ops.rank(-ops.ts_delta(close, 5))")
+```
+
+### Batch Fetch
+
+```python
+with AlphaSession(client, symbols, start, end) as s:
+    data = s.fetch("close", "volume", "open")  # dict[str, Alpha]
+    close, volume, open_ = data["close"], data["volume"], data["open"]
+```
+
+### Eager Mode
+
+Prefetch fields on session start:
+
+```python
+with AlphaSession(client, symbols, start, end, eager=True, fields=["close", "volume"]) as s:
+    # close and volume already cached
+    signal = s.close * s.volume
+```
+
+### Custom Field Registration
+
+```python
+with AlphaSession(client, symbols, start, end) as s:
+    s.register("vwap", DataSpec("daily", "vwap"))
+    signal = s.vwap / s.close
+```
+
+### Chunking for Large Universes
+
+For 3000+ symbols, use chunking to avoid OOM:
+
+```python
+with AlphaSession(client, symbols, start, end, chunk_size=500) as s:
+    # Internally processes 500 symbols at a time, combines results
+    alpha = s.close
+```
+
+### Thread Safety
+
+AlphaSession is thread-safe for concurrent access:
+
+```python
+with AlphaSession(client, symbols, start, end) as s:
+    # Safe to access from multiple threads
+    # First access fetches, subsequent accesses use cache
+    close = s.close
 ```
 
 ## Alpha Class
@@ -187,8 +270,21 @@ result = Alpha(close_df) * 2  # always works
 | Type | Description |
 |------|-------------|
 | `Alpha` | Wrapped DataFrame with operator overloading |
+| `AlphaSession` | Unified session with automatic data fetching |
 | `AlphaLike` | `Alpha`, `pl.DataFrame`, `int`, or `float` |
+| `DataSpec` | Field specification (source, field) for custom fields |
 | `Scalar` | `int` or `float` |
+
+## Exception Reference
+
+| Exception | Description |
+|-----------|-------------|
+| `AlphaError` | Base exception for alpha operations |
+| `AlphaSessionError` | Base exception for session operations |
+| `FieldNotFoundError` | Unknown field name |
+| `SessionNotActiveError` | Used session outside context manager |
+| `ColumnMismatchError` | DataFrames have different columns |
+| `DateMismatchError` | DataFrames have different row counts |
 
 ## Operator Categories
 

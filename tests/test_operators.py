@@ -9,6 +9,8 @@ import pytest
 from quantdl.exceptions import InvalidBucketSpecError
 from quantdl.operators import (
     abs as op_abs,
+)
+from quantdl.operators import (
     add,
     and_,
     bucket,
@@ -33,8 +35,6 @@ from quantdl.operators import (
     le,
     log,
     lt,
-    max as op_max,
-    min as op_min,
     multiply,
     ne,
     normalize,
@@ -76,6 +76,12 @@ from quantdl.operators import (
     vec_sum,
     winsorize,
     zscore,
+)
+from quantdl.operators import (
+    max as op_max,
+)
+from quantdl.operators import (
+    min as op_min,
 )
 
 

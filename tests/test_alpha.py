@@ -98,7 +98,7 @@ class TestAlphaClass:
         result = 1000 / alpha
         assert result.data["AAPL"][0] == 10.0
 
-    def test_pow_scalar(self, wide_df: pl.DataFrame) -> None:
+    def test_pow_scalar(self) -> None:
         """Test Alpha ** scalar."""
         df = pl.DataFrame({
             "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
@@ -115,7 +115,7 @@ class TestAlphaClass:
         result = -alpha
         assert result.data["AAPL"][0] == -100.0
 
-    def test_abs(self, wide_df: pl.DataFrame) -> None:
+    def test_abs(self) -> None:
         """Test abs(Alpha)."""
         df = pl.DataFrame({
             "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
@@ -405,7 +405,7 @@ class TestBuiltinFunctions:
         expected = math.log(100.0)
         assert abs(result.data["AAPL"][0] - expected) < 0.001
 
-    def test_sqrt(self, wide_df: pl.DataFrame) -> None:
+    def test_sqrt(self) -> None:
         """Test sqrt builtin."""
         df = pl.DataFrame({
             "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
@@ -416,7 +416,7 @@ class TestBuiltinFunctions:
         assert result.data["A"][1] == 3.0
         assert result.data["A"][2] == 4.0
 
-    def test_sign(self, wide_df: pl.DataFrame) -> None:
+    def test_sign(self) -> None:
         """Test sign builtin."""
         df = pl.DataFrame({
             "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 4), eager=True),

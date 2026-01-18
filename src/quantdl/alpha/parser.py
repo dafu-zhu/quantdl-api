@@ -14,14 +14,12 @@ from typing import Any
 
 import polars as pl
 
-from quantdl.alpha.core import Alpha
+from quantdl.alpha.core import Alpha, _get_value_cols
 from quantdl.alpha.types import AlphaLike
 
 
 class AlphaParseError(Exception):
     """Raised when expression parsing fails."""
-
-    pass
 
 
 # Safe binary operators
@@ -59,11 +57,6 @@ _BUILTINS: dict[str, Callable[..., Any]] = {
 }
 
 
-def _get_value_cols(df: pl.DataFrame) -> list[str]:
-    """Get value columns (all except first)."""
-    return df.columns[1:]
-
-
 def _apply_unary(x: AlphaLike, op: str) -> Alpha:
     """Apply unary function to Alpha/DataFrame."""
     if isinstance(x, Alpha):
@@ -89,25 +82,31 @@ def _apply_unary(x: AlphaLike, op: str) -> Alpha:
     return Alpha(result)
 
 
-def _elem_min(*args: AlphaLike) -> Alpha:
-    """Element-wise minimum across arguments."""
-    if len(args) < 2:
-        raise ValueError("min requires at least 2 arguments")
+def _elem_minmax(func_name: str, use_less_than: bool, args: tuple[AlphaLike, ...]) -> Alpha:
+    """Element-wise min/max across arguments.
 
-    # Get first as base
+    Args:
+        func_name: Function name for error messages ('min' or 'max')
+        use_less_than: If True, use < comparison (min); if False, use > (max)
+        args: Values to compare
+
+    Returns:
+        Alpha with element-wise min/max result
+    """
+    if len(args) < 2:
+        raise ValueError(f"{func_name} requires at least 2 arguments")
+
     first = args[0]
     if isinstance(first, Alpha):
         base_df = first.data
     elif isinstance(first, pl.DataFrame):
         base_df = first
     else:
-        raise TypeError(f"Cannot apply min to {type(first)}")
+        raise TypeError(f"Cannot apply {func_name} to {type(first)}")
 
     date_col = base_df.columns[0]
     value_cols = _get_value_cols(base_df)
-
-    # Build min expressions
-    min_exprs = {c: pl.col(c) for c in value_cols}
+    exprs = {c: pl.col(c) for c in value_cols}
 
     for arg in args[1:]:
         if isinstance(arg, Alpha):
@@ -115,64 +114,30 @@ def _elem_min(*args: AlphaLike) -> Alpha:
         elif isinstance(arg, pl.DataFrame):
             other_df = arg
         elif isinstance(arg, (int, float)):
-            # Scalar: compare with literal
             for c in value_cols:
-                min_exprs[c] = pl.when(min_exprs[c] < arg).then(min_exprs[c]).otherwise(arg)
+                cond = exprs[c] < arg if use_less_than else exprs[c] > arg
+                exprs[c] = pl.when(cond).then(exprs[c]).otherwise(arg)
             continue
         else:
-            raise TypeError(f"Cannot apply min to {type(arg)}")
+            raise TypeError(f"Cannot apply {func_name} to {type(arg)}")
 
-        # DataFrame comparison
         for c in value_cols:
             other_col = other_df[c]
-            min_exprs[c] = pl.when(min_exprs[c] < other_col).then(min_exprs[c]).otherwise(other_col)
+            cond = exprs[c] < other_col if use_less_than else exprs[c] > other_col
+            exprs[c] = pl.when(cond).then(exprs[c]).otherwise(other_col)
 
-    result = base_df.select(
-        pl.col(date_col),
-        *[min_exprs[c].alias(c) for c in value_cols],
-    )
+    result = base_df.select(pl.col(date_col), *[exprs[c].alias(c) for c in value_cols])
     return Alpha(result)
+
+
+def _elem_min(*args: AlphaLike) -> Alpha:
+    """Element-wise minimum across arguments."""
+    return _elem_minmax("min", True, args)
 
 
 def _elem_max(*args: AlphaLike) -> Alpha:
     """Element-wise maximum across arguments."""
-    if len(args) < 2:
-        raise ValueError("max requires at least 2 arguments")
-
-    first = args[0]
-    if isinstance(first, Alpha):
-        base_df = first.data
-    elif isinstance(first, pl.DataFrame):
-        base_df = first
-    else:
-        raise TypeError(f"Cannot apply max to {type(first)}")
-
-    date_col = base_df.columns[0]
-    value_cols = _get_value_cols(base_df)
-
-    max_exprs = {c: pl.col(c) for c in value_cols}
-
-    for arg in args[1:]:
-        if isinstance(arg, Alpha):
-            other_df = arg.data
-        elif isinstance(arg, pl.DataFrame):
-            other_df = arg
-        elif isinstance(arg, (int, float)):
-            for c in value_cols:
-                max_exprs[c] = pl.when(max_exprs[c] > arg).then(max_exprs[c]).otherwise(arg)
-            continue
-        else:
-            raise TypeError(f"Cannot apply max to {type(arg)}")
-
-        for c in value_cols:
-            other_col = other_df[c]
-            max_exprs[c] = pl.when(max_exprs[c] > other_col).then(max_exprs[c]).otherwise(other_col)
-
-    result = base_df.select(
-        pl.col(date_col),
-        *[max_exprs[c].alias(c) for c in value_cols],
-    )
-    return Alpha(result)
+    return _elem_minmax("max", False, args)
 
 
 class SafeEvaluator(ast.NodeVisitor):

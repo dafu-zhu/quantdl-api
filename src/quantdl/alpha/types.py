@@ -17,7 +17,7 @@ AlphaLike = Union["Alpha", pl.DataFrame, int, float]
 Scalar = Union[int, float]  # noqa: UP007
 
 # Data source types
-DataSourceType = Literal["daily", "fundamentals", "metrics"]
+DataSourceType = Literal["ticks", "fundamentals", "metrics"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +27,7 @@ class DataSpec:
     Defines how to fetch a named field from the QuantDLClient.
 
     Attributes:
-        source: Data source type (daily, fundamentals, metrics)
+        source: Data source type (ticks, fundamentals, metrics)
         field: Field name within the source (e.g., "close", "Revenue", "pe_ratio")
     """
 

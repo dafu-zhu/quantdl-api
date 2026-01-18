@@ -8,8 +8,6 @@ import polars as pl
 class AlphaError(Exception):
     """Base exception for alpha operations."""
 
-    pass
-
 
 class ColumnMismatchError(AlphaError):
     """Raised when DataFrames have mismatched columns."""
@@ -35,8 +33,6 @@ class DateMismatchError(AlphaError):
 
 class AlphaSessionError(AlphaError):
     """Base exception for alpha session operations."""
-
-    pass
 
 
 class FieldNotFoundError(AlphaSessionError):

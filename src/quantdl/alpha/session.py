@@ -22,13 +22,13 @@ if TYPE_CHECKING:
 # Default field aliases mapping name -> DataSpec
 FIELD_ALIASES: dict[str, DataSpec] = {
     # Daily OHLCV
-    "open": DataSpec("daily", "open"),
-    "high": DataSpec("daily", "high"),
-    "low": DataSpec("daily", "low"),
-    "close": DataSpec("daily", "close"),
-    "volume": DataSpec("daily", "volume"),
+    "open": DataSpec("ticks", "open"),
+    "high": DataSpec("ticks", "high"),
+    "low": DataSpec("ticks", "low"),
+    "close": DataSpec("ticks", "close"),
+    "volume": DataSpec("ticks", "volume"),
     # Shortcuts
-    "price": DataSpec("daily", "close"),
+    "price": DataSpec("ticks", "close"),
     # Fundamentals
     "revenue": DataSpec("fundamentals", "Revenue"),
     "net_income": DataSpec("fundamentals", "NetIncome"),
@@ -109,14 +109,15 @@ class AlphaSession:
 
     def _fetch_single_chunk(self, spec: DataSpec, symbols: Sequence[str]) -> pl.DataFrame:
         """Fetch data for a single chunk of symbols."""
-        if spec.source == "daily":
-            return self._client.daily(symbols, spec.field, self._start, self._end)
-        elif spec.source == "fundamentals":
-            return self._client.fundamentals(symbols, spec.field, self._start, self._end)
-        elif spec.source == "metrics":
-            return self._client.metrics(symbols, spec.field, self._start, self._end)
-        else:
-            raise ValueError(f"Unknown source: {spec.source}")
+        match spec.source:
+            case "ticks":
+                return self._client.daily(symbols, spec.field, self._start, self._end)
+            case "fundamentals":
+                return self._client.fundamentals(symbols, spec.field, self._start, self._end)
+            case "metrics":
+                return self._client.metrics(symbols, spec.field, self._start, self._end)
+            case _:
+                raise ValueError(f"Unknown source: {spec.source}")
 
     def _fetch_field(self, name: str) -> Alpha:
         """Fetch field data, using chunking if configured."""

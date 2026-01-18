@@ -14,7 +14,8 @@
       "Bash(python:*)",
       "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe -m pip install:*)",
       "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe -m mypy:*)",
-      "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe:*)"
+      "Bash(C:/Users/dafuz/Documents/GitHub/quantdl-api/.venv/Scripts/python.exe:*)",
+      "Bash(uv run ruff check:*)"
     ]
   }
 }

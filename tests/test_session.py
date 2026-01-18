@@ -122,7 +122,7 @@ class TestAlphaSessionRegister:
     def test_register_custom_field(self, client: QuantDLClient) -> None:
         """Test registering custom field."""
         with AlphaSession(client, ["AAPL"], "2024-01-02", "2024-01-10") as s:
-            s.register("adjusted_close", DataSpec("daily", "close"))
+            s.register("adjusted_close", DataSpec("ticks", "close"))
             adj = s.adjusted_close
             assert isinstance(adj, Alpha)
 
@@ -290,19 +290,19 @@ class TestDataSpec:
 
     def test_dataspec_creation(self) -> None:
         """Test DataSpec creation."""
-        spec = DataSpec("daily", "close")
-        assert spec.source == "daily"
+        spec = DataSpec("ticks", "close")
+        assert spec.source == "ticks"
         assert spec.field == "close"
 
     def test_dataspec_immutable(self) -> None:
         """Test DataSpec is immutable (frozen)."""
-        spec = DataSpec("daily", "close")
+        spec = DataSpec("ticks", "close")
         with pytest.raises(dataclasses.FrozenInstanceError):
             spec.field = "open"  # type: ignore[misc]
 
     def test_dataspec_hashable(self) -> None:
         """Test DataSpec is hashable."""
-        spec1 = DataSpec("daily", "close")
-        spec2 = DataSpec("daily", "close")
+        spec1 = DataSpec("ticks", "close")
+        spec2 = DataSpec("ticks", "close")
         assert hash(spec1) == hash(spec2)
         assert spec1 == spec2

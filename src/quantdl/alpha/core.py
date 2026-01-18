@@ -13,21 +13,67 @@ def _get_value_cols(df: pl.DataFrame) -> list[str]:
     return df.columns[1:]
 
 
-def _to_alpha(value: AlphaLike) -> Alpha:
-    """Convert AlphaLike to Alpha."""
-    if isinstance(value, Alpha):
-        return value
-    if isinstance(value, pl.DataFrame):
-        return Alpha(value)
-    # Scalar - will be handled at operation time
-    raise TypeError(f"Cannot convert {type(value)} to Alpha directly")
+def _scalar_expr(col: str, op: str, right: int | float) -> pl.Expr:
+    """Build expression for scalar binary operation."""
+    c = pl.col(col)
+    if op == "+":
+        return c + right
+    if op == "-":
+        return c - right
+    if op == "*":
+        return c * right
+    if op == "/":
+        return c / right
+    if op == "**":
+        return c ** right
+    if op == "<":
+        return (c < right).cast(pl.Float64)
+    if op == "<=":
+        return (c <= right).cast(pl.Float64)
+    if op == ">":
+        return (c > right).cast(pl.Float64)
+    if op == ">=":
+        return (c >= right).cast(pl.Float64)
+    if op == "==":
+        return (c == right).cast(pl.Float64)
+    if op == "!=":
+        return (c != right).cast(pl.Float64)
+    raise ValueError(f"Unknown op: {op}")
 
 
-def _apply_binary_op(
-    left: Alpha,
-    right: AlphaLike,
-    op: str,
-) -> Alpha:
+def _df_expr(col: str, op: str, right_col: pl.Series) -> pl.Expr:
+    """Build expression for DataFrame binary operation."""
+    c = pl.col(col)
+    if op == "+":
+        return c + right_col
+    if op == "-":
+        return c - right_col
+    if op == "*":
+        return c * right_col
+    if op == "/":
+        return c / right_col
+    if op == "**":
+        return c ** right_col
+    if op == "<":
+        return (c < right_col).cast(pl.Float64)
+    if op == "<=":
+        return (c <= right_col).cast(pl.Float64)
+    if op == ">":
+        return (c > right_col).cast(pl.Float64)
+    if op == ">=":
+        return (c >= right_col).cast(pl.Float64)
+    if op == "==":
+        return (c == right_col).cast(pl.Float64)
+    if op == "!=":
+        return (c != right_col).cast(pl.Float64)
+    if op == "&":
+        return (c.cast(pl.Boolean) & right_col.cast(pl.Boolean)).cast(pl.Float64)
+    if op == "|":
+        return (c.cast(pl.Boolean) | right_col.cast(pl.Boolean)).cast(pl.Float64)
+    raise ValueError(f"Unknown op: {op}")
+
+
+def _apply_binary_op(left: Alpha, right: AlphaLike, op: str) -> Alpha:
     """Apply binary operation between Alpha and AlphaLike.
 
     Args:
@@ -43,83 +89,41 @@ def _apply_binary_op(
     value_cols = _get_value_cols(left_df)
 
     if isinstance(right, (int, float)):
-        # Scalar operation
-        if op == "+":
-            exprs = [pl.col(c) + right for c in value_cols]
-        elif op == "-":
-            exprs = [pl.col(c) - right for c in value_cols]
-        elif op == "*":
-            exprs = [pl.col(c) * right for c in value_cols]
-        elif op == "/":
-            exprs = [pl.col(c) / right for c in value_cols]
-        elif op == "**":
-            exprs = [pl.col(c) ** right for c in value_cols]
-        elif op == "<":
-            exprs = [(pl.col(c) < right).cast(pl.Float64) for c in value_cols]
-        elif op == "<=":
-            exprs = [(pl.col(c) <= right).cast(pl.Float64) for c in value_cols]
-        elif op == ">":
-            exprs = [(pl.col(c) > right).cast(pl.Float64) for c in value_cols]
-        elif op == ">=":
-            exprs = [(pl.col(c) >= right).cast(pl.Float64) for c in value_cols]
-        elif op == "==":
-            exprs = [(pl.col(c) == right).cast(pl.Float64) for c in value_cols]
-        elif op == "!=":
-            exprs = [(pl.col(c) != right).cast(pl.Float64) for c in value_cols]
-        else:
-            raise ValueError(f"Unknown op: {op}")
+        exprs = [_scalar_expr(c, op, right) for c in value_cols]
+        return Alpha(left_df.select(pl.col(date_col), *exprs))
 
-        result = left_df.select(pl.col(date_col), *exprs)
-        return Alpha(result)
-
-    # DataFrame or Alpha operation
     right_df = right.data if isinstance(right, Alpha) else right
     _validate_alignment(left_df, right_df)
 
+    exprs = [_df_expr(c, op, right_df[c]) for c in value_cols]
+    return Alpha(left_df.select(pl.col(date_col), *exprs))
+
+
+def _reverse_scalar_expr(col: str, left: Scalar, op: str) -> pl.Expr:
+    """Build expression for reverse scalar binary operation (scalar op Alpha)."""
+    c = pl.col(col)
     if op == "+":
-        exprs = [pl.col(c) + right_df[c] for c in value_cols]
-    elif op == "-":
-        exprs = [pl.col(c) - right_df[c] for c in value_cols]
-    elif op == "*":
-        exprs = [pl.col(c) * right_df[c] for c in value_cols]
-    elif op == "/":
-        exprs = [pl.col(c) / right_df[c] for c in value_cols]
-    elif op == "**":
-        exprs = [pl.col(c) ** right_df[c] for c in value_cols]
-    elif op == "<":
-        exprs = [(pl.col(c) < right_df[c]).cast(pl.Float64) for c in value_cols]
-    elif op == "<=":
-        exprs = [(pl.col(c) <= right_df[c]).cast(pl.Float64) for c in value_cols]
-    elif op == ">":
-        exprs = [(pl.col(c) > right_df[c]).cast(pl.Float64) for c in value_cols]
-    elif op == ">=":
-        exprs = [(pl.col(c) >= right_df[c]).cast(pl.Float64) for c in value_cols]
-    elif op == "==":
-        exprs = [(pl.col(c) == right_df[c]).cast(pl.Float64) for c in value_cols]
-    elif op == "!=":
-        exprs = [(pl.col(c) != right_df[c]).cast(pl.Float64) for c in value_cols]
-    elif op == "&":
-        exprs = [
-            (pl.col(c).cast(pl.Boolean) & right_df[c].cast(pl.Boolean)).cast(pl.Float64)
-            for c in value_cols
-        ]
-    elif op == "|":
-        exprs = [
-            (pl.col(c).cast(pl.Boolean) | right_df[c].cast(pl.Boolean)).cast(pl.Float64)
-            for c in value_cols
-        ]
-    else:
-        raise ValueError(f"Unknown op: {op}")
-
-    result = left_df.select(pl.col(date_col), *exprs)
-    return Alpha(result)
+        return (left + c).alias(col)
+    if op == "-":
+        return (left - c).alias(col)
+    if op == "*":
+        return (left * c).alias(col)
+    if op == "/":
+        return (left / c).alias(col)
+    if op == "**":
+        return (pl.lit(left) ** c).alias(col)
+    if op == "<":
+        return (pl.lit(left) < c).cast(pl.Float64).alias(col)
+    if op == "<=":
+        return (pl.lit(left) <= c).cast(pl.Float64).alias(col)
+    if op == ">":
+        return (pl.lit(left) > c).cast(pl.Float64).alias(col)
+    if op == ">=":
+        return (pl.lit(left) >= c).cast(pl.Float64).alias(col)
+    raise ValueError(f"Unknown op: {op}")
 
 
-def _apply_reverse_binary_op(
-    right: Alpha,
-    left: Scalar,
-    op: str,
-) -> Alpha:
+def _apply_reverse_binary_op(right: Alpha, left: Scalar, op: str) -> Alpha:
     """Apply reverse binary operation (scalar op Alpha).
 
     Args:
@@ -134,29 +138,8 @@ def _apply_reverse_binary_op(
     date_col = right_df.columns[0]
     value_cols = _get_value_cols(right_df)
 
-    if op == "+":
-        exprs = [(left + pl.col(c)).alias(c) for c in value_cols]
-    elif op == "-":
-        exprs = [(left - pl.col(c)).alias(c) for c in value_cols]
-    elif op == "*":
-        exprs = [(left * pl.col(c)).alias(c) for c in value_cols]
-    elif op == "/":
-        exprs = [(left / pl.col(c)).alias(c) for c in value_cols]
-    elif op == "**":
-        exprs = [(pl.lit(left) ** pl.col(c)).alias(c) for c in value_cols]
-    elif op == "<":
-        exprs = [(pl.lit(left) < pl.col(c)).cast(pl.Float64).alias(c) for c in value_cols]
-    elif op == "<=":
-        exprs = [(pl.lit(left) <= pl.col(c)).cast(pl.Float64).alias(c) for c in value_cols]
-    elif op == ">":
-        exprs = [(pl.lit(left) > pl.col(c)).cast(pl.Float64).alias(c) for c in value_cols]
-    elif op == ">=":
-        exprs = [(pl.lit(left) >= pl.col(c)).cast(pl.Float64).alias(c) for c in value_cols]
-    else:
-        raise ValueError(f"Unknown op: {op}")
-
-    result = right_df.select(pl.col(date_col), *exprs)
-    return Alpha(result)
+    exprs = [_reverse_scalar_expr(c, left, op) for c in value_cols]
+    return Alpha(right_df.select(pl.col(date_col), *exprs))
 
 
 class Alpha:

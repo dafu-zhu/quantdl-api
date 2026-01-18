@@ -20,7 +20,7 @@ AlphaSession(client, symbols, start, end)
 
 ### AlphaSession Class
 
-**Location**: `src/quantdl/alpha/session.py:56-232`
+**Location**: `src/quantdl/alpha/session.py:41-237`
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -38,7 +38,7 @@ AlphaSession(client, symbols, start, end)
 ```python
 @dataclass(frozen=True, slots=True)
 class DataSpec:
-    source: Literal["daily", "fundamentals", "metrics"]
+    source: Literal["ticks", "fundamentals", "metrics"]
     field: str
 ```
 
@@ -48,12 +48,12 @@ class DataSpec:
 
 ```python
 FIELD_ALIASES = {
-    "open": DataSpec("daily", "open"),
-    "high": DataSpec("daily", "high"),
-    "low": DataSpec("daily", "low"),
-    "close": DataSpec("daily", "close"),
-    "volume": DataSpec("daily", "volume"),
-    "price": DataSpec("daily", "close"),
+    "open": DataSpec("ticks", "open"),
+    "high": DataSpec("ticks", "high"),
+    "low": DataSpec("ticks", "low"),
+    "close": DataSpec("ticks", "close"),
+    "volume": DataSpec("ticks", "volume"),
+    "price": DataSpec("ticks", "close"),
     "revenue": DataSpec("fundamentals", "Revenue"),
     "net_income": DataSpec("fundamentals", "NetIncome"),
     "pe": DataSpec("metrics", "pe_ratio"),
@@ -67,7 +67,7 @@ FIELD_ALIASES = {
 
 ### `__getattr__` - Lazy Field Access
 
-**Location**: `src/quantdl/alpha/session.py:151-164`
+**Location**: `src/quantdl/alpha/session.py:152-165`
 
 | Aspect | Details |
 |--------|---------|
@@ -117,7 +117,7 @@ with AlphaSession(client, ["AAPL", "MSFT"], "2024-01-01", "2024-12-31") as s:
 
 ### `fetch` - Batch Fetch
 
-**Location**: `src/quantdl/alpha/session.py:166-187`
+**Location**: `src/quantdl/alpha/session.py:167-188`
 
 | Aspect | Details |
 |--------|---------|
@@ -164,7 +164,7 @@ with AlphaSession(client, ["AAPL", "MSFT"], "2024-01-01", "2024-12-31") as s:
 
 ### `eval` - String DSL Evaluation
 
-**Location**: `src/quantdl/alpha/session.py:189-217`
+**Location**: `src/quantdl/alpha/session.py:190-218`
 
 | Aspect | Details |
 |--------|---------|
@@ -219,7 +219,7 @@ with AlphaSession(client, ["AAPL", "MSFT", "GOOGL"], "2024-01-01", "2024-12-31")
 
 ### `register` - Custom Field Registration
 
-**Location**: `src/quantdl/alpha/session.py:219-226`
+**Location**: `src/quantdl/alpha/session.py:220-227`
 
 | Aspect | Details |
 |--------|---------|
@@ -230,11 +230,11 @@ with AlphaSession(client, ["AAPL", "MSFT", "GOOGL"], "2024-01-01", "2024-12-31")
 **Example**:
 ```python
 # Goal: Register VWAP as a custom field
-# Input: name="vwap", spec=DataSpec("daily", "vwap")
+# Input: name="vwap", spec=DataSpec("ticks", "vwap")
 # Output: session.vwap now fetches daily vwap data
 
 with AlphaSession(client, symbols, start, end) as s:
-    s.register("vwap", DataSpec("daily", "vwap"))
+    s.register("vwap", DataSpec("ticks", "vwap"))
 
     vwap = s.vwap  # Now works!
     signal = s.close / vwap  # Alpha arithmetic
@@ -244,7 +244,7 @@ with AlphaSession(client, symbols, start, end) as s:
 
 ### `_fetch_field` - Internal Fetch Logic
 
-**Location**: `src/quantdl/alpha/session.py:115-149`
+**Location**: `src/quantdl/alpha/session.py:122-150`
 
 | Aspect | Details |
 |--------|---------|
@@ -252,7 +252,7 @@ with AlphaSession(client, symbols, start, end) as s:
 | **Input** | Field name |
 | **Output** | `Alpha` with combined data |
 
-**Chunking Logic** (`src/quantdl/alpha/session.py:125-149`):
+**Chunking Logic** (`src/quantdl/alpha/session.py:122-150`):
 ```python
 def _fetch_field(self, name: str) -> Alpha:
     spec = self._resolve_spec(name)
@@ -299,7 +299,7 @@ with AlphaSession(client, symbols, start, end, chunk_size=500) as s:
 
 ## Context Manager
 
-**Location**: `src/quantdl/alpha/session.py:228-235`
+**Location**: `src/quantdl/alpha/session.py:229-237`
 
 ```python
 def __enter__(self) -> AlphaSession:
@@ -338,7 +338,7 @@ with AlphaSession(
 
 ## Thread Safety
 
-**Location**: `src/quantdl/alpha/session.py:158-163`
+**Location**: `src/quantdl/alpha/session.py:160-165`
 
 The session uses `threading.Lock` to ensure thread-safe access:
 
@@ -379,7 +379,7 @@ with AlphaSession(client, symbols, start, end) as s:
 
 ## Variable Proxy
 
-**Location**: `src/quantdl/alpha/session.py:238-261`
+**Location**: `src/quantdl/alpha/session.py:240-262`
 
 `_SessionVariableProxy` enables `eval()` to auto-fetch fields:
 
@@ -410,7 +410,7 @@ class _SessionVariableProxy(dict[str, Any]):
 
 ## Exceptions
 
-**Location**: `src/quantdl/alpha/validation.py:36-54`
+**Location**: `src/quantdl/alpha/validation.py:38-50`
 
 | Exception | Trigger | Example |
 |-----------|---------|---------|

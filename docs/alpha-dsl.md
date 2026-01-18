@@ -48,8 +48,8 @@ with AlphaSession(client, ["AAPL", "MSFT", "GOOGL"], "2024-01-01", "2024-12-31")
 
 | Field | Source | Description |
 |-------|--------|-------------|
-| `close`, `open`, `high`, `low`, `volume` | daily | OHLCV data |
-| `price` | daily | Alias for close |
+| `close`, `open`, `high`, `low`, `volume` | ticks | OHLCV data |
+| `price` | ticks | Alias for close |
 | `revenue`, `net_income` | fundamentals | SEC filings |
 | `pe`, `pb` | metrics | Valuation ratios |
 
@@ -82,7 +82,7 @@ with AlphaSession(client, symbols, start, end, eager=True, fields=["close", "vol
 
 ```python
 with AlphaSession(client, symbols, start, end) as s:
-    s.register("vwap", DataSpec("daily", "vwap"))
+    s.register("vwap", DataSpec("ticks", "vwap"))
     signal = s.vwap / s.close
 ```
 

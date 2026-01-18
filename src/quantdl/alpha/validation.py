@@ -33,6 +33,27 @@ class DateMismatchError(AlphaError):
         )
 
 
+class AlphaSessionError(AlphaError):
+    """Base exception for alpha session operations."""
+
+    pass
+
+
+class FieldNotFoundError(AlphaSessionError):
+    """Raised when a field name is not found in session."""
+
+    def __init__(self, field: str) -> None:
+        self.field = field
+        super().__init__(f"Unknown field: {field}")
+
+
+class SessionNotActiveError(AlphaSessionError):
+    """Raised when accessing session outside context manager."""
+
+    def __init__(self) -> None:
+        super().__init__("Session not active; use 'with AlphaSession(...) as s:'")
+
+
 def _validate_alignment(left: pl.DataFrame, right: pl.DataFrame) -> None:
     """Validate that two DataFrames are aligned for operations.
 

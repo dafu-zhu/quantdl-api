@@ -13,7 +13,7 @@ def _get_value_cols(df: pl.DataFrame) -> list[str]:
     return df.columns[1:]
 
 
-def abs_(x: pl.DataFrame) -> pl.DataFrame:
+def abs(x: pl.DataFrame) -> pl.DataFrame:
     """Absolute value.
 
     Args:
@@ -205,7 +205,7 @@ def log(x: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def max_(*args: pl.DataFrame) -> pl.DataFrame:
+def max(*args: pl.DataFrame) -> pl.DataFrame:
     """Element-wise maximum of two or more DataFrames.
 
     Args:
@@ -215,7 +215,7 @@ def max_(*args: pl.DataFrame) -> pl.DataFrame:
         Wide DataFrame with max values across inputs
     """
     if len(args) < 2:
-        raise ValueError("max_ requires at least 2 inputs")
+        raise ValueError("max requires at least 2 inputs")
 
     date_col = args[0].columns[0]
     value_cols = _get_value_cols(args[0])
@@ -229,7 +229,7 @@ def max_(*args: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def min_(*args: pl.DataFrame) -> pl.DataFrame:
+def min(*args: pl.DataFrame) -> pl.DataFrame:
     """Element-wise minimum of two or more DataFrames.
 
     Args:
@@ -239,7 +239,7 @@ def min_(*args: pl.DataFrame) -> pl.DataFrame:
         Wide DataFrame with min values across inputs
     """
     if len(args) < 2:
-        raise ValueError("min_ requires at least 2 inputs")
+        raise ValueError("min requires at least 2 inputs")
 
     date_col = args[0].columns[0]
     value_cols = _get_value_cols(args[0])

@@ -19,6 +19,23 @@ Example:
     ```
 """
 
+from quantdl.operators.arithmetic import (
+    abs,
+    add,
+    densify,
+    divide,
+    inverse,
+    log,
+    max,
+    min,
+    multiply,
+    power,
+    reverse,
+    sign,
+    signed_power,
+    sqrt,
+    subtract,
+)
 from quantdl.operators.cross_sectional import (
     normalize,
     quantile,
@@ -26,6 +43,27 @@ from quantdl.operators.cross_sectional import (
     scale,
     winsorize,
     zscore,
+)
+from quantdl.operators.group import (
+    group_backfill,
+    group_mean,
+    group_neutralize,
+    group_rank,
+    group_scale,
+    group_zscore,
+)
+from quantdl.operators.logical import (
+    and_,
+    eq,
+    ge,
+    gt,
+    if_else,
+    is_nan,
+    le,
+    lt,
+    ne,
+    not_,
+    or_,
 )
 from quantdl.operators.time_series import (
     days_from_last_change,
@@ -55,6 +93,11 @@ from quantdl.operators.time_series import (
     ts_sum,
     ts_zscore,
 )
+from quantdl.operators.transformational import (
+    bucket,
+    trade_when,
+)
+from quantdl.operators.vector import vec_avg, vec_sum
 
 __all__ = [
     # Time-series operators (basic)
@@ -96,4 +139,45 @@ __all__ = [
     "scale",
     "quantile",
     "winsorize",
+    # Group operators
+    "group_rank",
+    "group_zscore",
+    "group_scale",
+    "group_neutralize",
+    "group_mean",
+    "group_backfill",
+    # Vector operators
+    "vec_avg",
+    "vec_sum",
+    # Arithmetic operators
+    "abs",
+    "add",
+    "subtract",
+    "multiply",
+    "divide",
+    "inverse",
+    "log",
+    "max",
+    "min",
+    "power",
+    "signed_power",
+    "sqrt",
+    "sign",
+    "reverse",
+    "densify",
+    # Logical operators
+    "and_",
+    "or_",
+    "not_",
+    "if_else",
+    "is_nan",
+    "lt",
+    "le",
+    "gt",
+    "ge",
+    "eq",
+    "ne",
+    # Transformational operators
+    "bucket",
+    "trade_when",
 ]

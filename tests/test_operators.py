@@ -6,15 +6,50 @@ from datetime import date
 import polars as pl
 import pytest
 
+from quantdl.exceptions import InvalidBucketSpecError
 from quantdl.operators import (
+    abs,
+    add,
+    and_,
+    bucket,
     days_from_last_change,
+    densify,
+    divide,
+    eq,
+    ge,
+    group_backfill,
+    group_mean,
+    group_neutralize,
+    group_rank,
+    group_scale,
+    group_zscore,
+    gt,
     hump,
+    if_else,
+    inverse,
+    is_nan,
     kth_element,
     last_diff_value,
+    le,
+    log,
+    lt,
+    max,
+    min,
+    multiply,
+    ne,
     normalize,
+    not_,
+    or_,
+    power,
     quantile,
     rank,
+    reverse,
     scale,
+    sign,
+    signed_power,
+    sqrt,
+    subtract,
+    trade_when,
     ts_arg_max,
     ts_arg_min,
     ts_av_diff,
@@ -37,6 +72,8 @@ from quantdl.operators import (
     ts_step,
     ts_sum,
     ts_zscore,
+    vec_avg,
+    vec_sum,
     winsorize,
     zscore,
 )
@@ -51,6 +88,11 @@ def wide_df() -> pl.DataFrame:
         "MSFT": [200.0, 202.0, 201.0, 203.0, 205.0, 204.0, 206.0, 208.0, 207.0, 210.0],
         "GOOGL": [150.0, 152.0, 151.0, 153.0, 155.0, 154.0, 156.0, 158.0, 157.0, 160.0],
     })
+
+
+# =============================================================================
+# TIME-SERIES OPERATORS
+# =============================================================================
 
 
 class TestTimeSeriesOperators:
@@ -208,9 +250,7 @@ class TestTimeSeriesOperators:
             "AAPL": [100.0, 100.0, 102.0, 102.0, 102.0],
         })
         result = last_diff_value(df, 3)
-        # At idx 4: window [102, 102, 102], current=102, last diff in window is 100 at idx 2
-        # But idx 2 is not in window [2,3,4], so None
-        # Actually at idx 3: window [100, 102, 102], current=102, last diff=100
+        # At idx 3: window [100, 102, 102], current=102, last diff=100
         assert result["AAPL"][3] == 100.0
 
     def test_days_from_last_change(self) -> None:
@@ -302,6 +342,11 @@ class TestTimeSeriesOperators:
             val = result["AAPL"][i]
             if val is not None:
                 assert abs(val - 1.0) < 0.01
+
+
+# =============================================================================
+# CROSS-SECTIONAL OPERATORS
+# =============================================================================
 
 
 class TestCrossSectionalOperators:
@@ -492,6 +537,1185 @@ class TestCrossSectionalOperators:
         assert result["C"][0] < 100.0
 
 
+# =============================================================================
+# ARITHMETIC OPERATORS
+# =============================================================================
+
+
+class TestArithmeticOperators:
+    """Arithmetic operator tests."""
+
+    @pytest.fixture
+    def arith_df(self) -> pl.DataFrame:
+        """Create sample wide DataFrame for arithmetic tests."""
+        return pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [100.0, -50.0, 25.0, 0.0, -10.0],
+            "MSFT": [200.0, 100.0, -50.0, 75.0, 0.0],
+            "GOOGL": [-150.0, 0.0, 30.0, -20.0, 40.0],
+        })
+
+    @pytest.fixture
+    def arith_df2(self) -> pl.DataFrame:
+        """Create second sample wide DataFrame for two-input ops."""
+        return pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [10.0, 5.0, 5.0, 2.0, -2.0],
+            "MSFT": [20.0, 10.0, -10.0, 15.0, 1.0],
+            "GOOGL": [-30.0, 1.0, 6.0, -4.0, 8.0],
+        })
+
+    def test_abs_basic(self, arith_df: pl.DataFrame) -> None:
+        """Test absolute value computation."""
+        result = abs(arith_df)
+        assert result.columns == arith_df.columns
+        assert result["AAPL"][0] == 100.0
+        assert result["AAPL"][1] == 50.0  # |-50| = 50
+        assert result["GOOGL"][0] == 150.0  # |-150| = 150
+        assert result["AAPL"][3] == 0.0
+
+    def test_add_two_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test adding two DataFrames."""
+        result = add(arith_df, arith_df2)
+        assert result.columns == arith_df.columns
+        assert result["AAPL"][0] == 110.0  # 100 + 10
+        assert result["AAPL"][1] == -45.0  # -50 + 5
+        assert result["GOOGL"][0] == -180.0  # -150 + -30
+
+    def test_add_three_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test adding three DataFrames."""
+        result = add(arith_df, arith_df2, arith_df)
+        assert result["AAPL"][0] == 210.0  # 100 + 10 + 100
+
+    def test_add_filter_null(self) -> None:
+        """Test add with filter=True treats null as 0."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [10.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [None]})
+        result = add(df1, df2, filter=True)
+        assert result["A"][0] == 10.0  # 10 + 0
+
+    def test_add_without_filter_propagates_null(self) -> None:
+        """Test add without filter propagates null."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [10.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [None]})
+        result = add(df1, df2, filter=False)
+        assert result["A"][0] is None
+
+    def test_add_requires_two_inputs(self, arith_df: pl.DataFrame) -> None:
+        """Test add raises error with less than 2 inputs."""
+        with pytest.raises(ValueError, match="at least 2"):
+            add(arith_df)
+
+    def test_subtract_basic(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test basic subtraction."""
+        result = subtract(arith_df, arith_df2)
+        assert result["AAPL"][0] == 90.0  # 100 - 10
+        assert result["AAPL"][1] == -55.0  # -50 - 5
+        assert result["GOOGL"][0] == -120.0  # -150 - -30
+
+    def test_subtract_filter_null(self) -> None:
+        """Test subtract with filter=True treats null as 0."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [10.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [None]})
+        result = subtract(df1, df2, filter=True)
+        assert result["A"][0] == 10.0  # 10 - 0
+
+    def test_multiply_two_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test multiplying two DataFrames."""
+        result = multiply(arith_df, arith_df2)
+        assert result["AAPL"][0] == 1000.0  # 100 * 10
+        assert result["AAPL"][1] == -250.0  # -50 * 5
+        assert result["GOOGL"][0] == 4500.0  # -150 * -30
+
+    def test_multiply_filter_null(self) -> None:
+        """Test multiply with filter=True treats null as 1."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [10.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [None]})
+        result = multiply(df1, df2, filter=True)
+        assert result["A"][0] == 10.0  # 10 * 1
+
+    def test_multiply_without_filter_propagates_null(self) -> None:
+        """Test multiply without filter propagates null."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [10.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [None]})
+        result = multiply(df1, df2, filter=False)
+        assert result["A"][0] is None
+
+    def test_multiply_requires_two_inputs(self, arith_df: pl.DataFrame) -> None:
+        """Test multiply raises error with less than 2 inputs."""
+        with pytest.raises(ValueError, match="at least 2"):
+            multiply(arith_df)
+
+    def test_divide_basic(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test basic division."""
+        result = divide(arith_df, arith_df2)
+        assert result["AAPL"][0] == 10.0  # 100 / 10
+        assert result["AAPL"][1] == -10.0  # -50 / 5
+
+    def test_divide_by_zero_returns_null(self) -> None:
+        """Test division by zero returns null."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [10.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = divide(df1, df2)
+        assert result["A"][0] is None
+
+    def test_divide_zero_by_nonzero(self) -> None:
+        """Test 0/x = 0."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
+        result = divide(df1, df2)
+        assert result["A"][0] == 0.0
+
+    def test_inverse_basic(self) -> None:
+        """Test basic inverse computation."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "A": [2.0, 4.0],
+        })
+        result = inverse(df)
+        assert result["A"][0] == 0.5  # 1/2
+        assert result["A"][1] == 0.25  # 1/4
+
+    def test_inverse_of_zero_returns_null(self) -> None:
+        """Test 1/0 returns null."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = inverse(df)
+        assert result["A"][0] is None
+
+    def test_inverse_negative(self) -> None:
+        """Test inverse of negative number."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-5.0]})
+        result = inverse(df)
+        assert result["A"][0] == -0.2
+
+    def test_log_basic(self) -> None:
+        """Test basic natural log computation."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "A": [math.e, math.e ** 2],
+        })
+        result = log(df)
+        assert abs(result["A"][0] - 1.0) < 0.01
+        assert abs(result["A"][1] - 2.0) < 0.01
+
+    def test_log_of_one(self) -> None:
+        """Test ln(1) = 0."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [1.0]})
+        result = log(df)
+        assert result["A"][0] == 0.0
+
+    def test_log_of_zero_returns_null(self) -> None:
+        """Test ln(0) returns null."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = log(df)
+        assert result["A"][0] is None
+
+    def test_log_of_negative_returns_null(self) -> None:
+        """Test ln(negative) returns null."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-5.0]})
+        result = log(df)
+        assert result["A"][0] is None
+
+    def test_max_two_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test element-wise max of two DataFrames."""
+        result = max(arith_df, arith_df2)
+        assert result["AAPL"][0] == 100.0  # max(100, 10)
+        assert result["AAPL"][1] == 5.0  # max(-50, 5)
+        assert result["GOOGL"][0] == -30.0  # max(-150, -30)
+
+    def test_max_three_inputs(self) -> None:
+        """Test element-wise max of three DataFrames."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [1.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
+        df3 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [3.0]})
+        result = max(df1, df2, df3)
+        assert result["A"][0] == 5.0
+
+    def test_max_requires_two_inputs(self, arith_df: pl.DataFrame) -> None:
+        """Test max raises error with less than 2 inputs."""
+        with pytest.raises(ValueError, match="at least 2"):
+            max(arith_df)
+
+    def test_min_two_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
+        """Test element-wise min of two DataFrames."""
+        result = min(arith_df, arith_df2)
+        assert result["AAPL"][0] == 10.0  # min(100, 10)
+        assert result["AAPL"][1] == -50.0  # min(-50, 5)
+        assert result["GOOGL"][0] == -150.0  # min(-150, -30)
+
+    def test_min_three_inputs(self) -> None:
+        """Test element-wise min of three DataFrames."""
+        df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [1.0]})
+        df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
+        df3 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [3.0]})
+        result = min(df1, df2, df3)
+        assert result["A"][0] == 1.0
+
+    def test_min_requires_two_inputs(self, arith_df: pl.DataFrame) -> None:
+        """Test min raises error with less than 2 inputs."""
+        with pytest.raises(ValueError, match="at least 2"):
+            min(arith_df)
+
+    def test_power_basic(self) -> None:
+        """Test basic power computation."""
+        df_base = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "A": [2.0, 3.0],
+        })
+        df_exp = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "A": [3.0, 2.0],
+        })
+        result = power(df_base, df_exp)
+        assert result["A"][0] == 8.0  # 2^3
+        assert result["A"][1] == 9.0  # 3^2
+
+    def test_power_zero_exponent(self) -> None:
+        """Test x^0 = 1."""
+        df_base = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
+        df_exp = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = power(df_base, df_exp)
+        assert result["A"][0] == 1.0
+
+    def test_power_negative_base(self) -> None:
+        """Test negative base with integer exponent."""
+        df_base = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-2.0]})
+        df_exp = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [3.0]})
+        result = power(df_base, df_exp)
+        assert result["A"][0] == -8.0  # (-2)^3
+
+    def test_signed_power_positive(self) -> None:
+        """Test signed_power with positive base."""
+        df_base = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [4.0]})
+        df_exp = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [2.0]})
+        result = signed_power(df_base, df_exp)
+        assert result["A"][0] == 16.0  # sign(4) * |4|^2 = 1 * 16
+
+    def test_signed_power_negative(self) -> None:
+        """Test signed_power with negative base."""
+        df_base = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-4.0]})
+        df_exp = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [2.0]})
+        result = signed_power(df_base, df_exp)
+        assert result["A"][0] == -16.0  # sign(-4) * |-4|^2 = -1 * 16
+
+    def test_signed_power_fractional_exp(self) -> None:
+        """Test signed_power with fractional exponent preserves sign."""
+        df_base = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-9.0]})
+        df_exp = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.5]})
+        result = signed_power(df_base, df_exp)
+        assert result["A"][0] == -3.0  # sign(-9) * |-9|^0.5 = -1 * 3
+
+    def test_sqrt_basic(self) -> None:
+        """Test basic square root computation."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "A": [4.0, 9.0],
+        })
+        result = sqrt(df)
+        assert result["A"][0] == 2.0
+        assert result["A"][1] == 3.0
+
+    def test_sqrt_of_zero(self) -> None:
+        """Test sqrt(0) = 0."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = sqrt(df)
+        assert result["A"][0] == 0.0
+
+    def test_sqrt_of_negative_returns_null(self) -> None:
+        """Test sqrt(negative) returns null."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-4.0]})
+        result = sqrt(df)
+        assert result["A"][0] is None
+
+    def test_sign_positive(self) -> None:
+        """Test sign of positive number."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
+        result = sign(df)
+        assert result["A"][0] == 1
+
+    def test_sign_negative(self) -> None:
+        """Test sign of negative number."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [-5.0]})
+        result = sign(df)
+        assert result["A"][0] == -1
+
+    def test_sign_zero(self) -> None:
+        """Test sign of zero."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = sign(df)
+        assert result["A"][0] == 0
+
+    def test_sign_null(self) -> None:
+        """Test sign of null returns null."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": pl.Series([None], dtype=pl.Float64)})
+        result = sign(df)
+        assert result["A"][0] is None
+
+    def test_reverse_basic(self, arith_df: pl.DataFrame) -> None:
+        """Test basic negation."""
+        result = reverse(arith_df)
+        assert result["AAPL"][0] == -100.0
+        assert result["AAPL"][1] == 50.0  # -(-50)
+        assert result["GOOGL"][0] == 150.0  # -(-150)
+
+    def test_reverse_zero(self) -> None:
+        """Test -0 = 0."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [0.0]})
+        result = reverse(df)
+        assert result["A"][0] == 0.0
+
+    def test_densify_basic(self) -> None:
+        """Test basic densify remapping."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [10.0],
+            "B": [30.0],
+            "C": [10.0],  # Same as A
+            "D": [20.0],
+        })
+        result = densify(df)
+        # Values should be remapped to 0..n-1 based on unique sorted values
+        # Sorted unique: [10, 20, 30] -> ranks: 10->0, 20->1, 30->2
+        assert result["A"][0] == 0  # 10 -> rank 0
+        assert result["C"][0] == 0  # 10 -> rank 0 (same as A)
+        assert result["D"][0] == 1  # 20 -> rank 1
+        assert result["B"][0] == 2  # 30 -> rank 2
+
+    def test_densify_all_same(self) -> None:
+        """Test densify with all same values."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+            "B": [5.0],
+            "C": [5.0],
+        })
+        result = densify(df)
+        # All same, should all be 0
+        assert result["A"][0] == 0
+        assert result["B"][0] == 0
+        assert result["C"][0] == 0
+
+    def test_densify_per_row(self) -> None:
+        """Test that densify works per row independently."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "A": [10.0, 100.0],
+            "B": [20.0, 50.0],
+        })
+        result = densify(df)
+        # Row 1: 10->0, 20->1
+        # Row 2: 50->0, 100->1
+        assert result["A"][0] == 0
+        assert result["B"][0] == 1
+        assert result["B"][1] == 0  # 50 is smaller in row 2
+        assert result["A"][1] == 1  # 100 is larger in row 2
+
+    def test_abs_with_null(self) -> None:
+        """Test abs_ preserves nulls."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": pl.Series([None], dtype=pl.Float64)})
+        result = abs(df)
+        assert result["A"][0] is None
+
+    def test_sqrt_with_null(self) -> None:
+        """Test sqrt preserves nulls."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": pl.Series([None], dtype=pl.Float64)})
+        result = sqrt(df)
+        assert result["A"][0] is None
+
+    def test_log_with_null(self) -> None:
+        """Test log preserves nulls."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": pl.Series([None], dtype=pl.Float64)})
+        result = log(df)
+        assert result["A"][0] is None
+
+    def test_reverse_with_null(self) -> None:
+        """Test reverse preserves nulls."""
+        df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": pl.Series([None], dtype=pl.Float64)})
+        result = reverse(df)
+        assert result["A"][0] is None
+
+
+# =============================================================================
+# LOGICAL OPERATORS
+# =============================================================================
+
+
+class TestLogicalOperators:
+    """Logical operator tests."""
+
+    @pytest.fixture
+    def bool_df_a(self) -> pl.DataFrame:
+        """Create boolean DataFrame A."""
+        return pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [True, False, True, False, True],
+            "MSFT": [True, True, False, False, True],
+        })
+
+    @pytest.fixture
+    def bool_df_b(self) -> pl.DataFrame:
+        """Create boolean DataFrame B."""
+        return pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [True, True, True, False, False],
+            "MSFT": [False, True, False, True, True],
+        })
+
+    @pytest.fixture
+    def numeric_df(self) -> pl.DataFrame:
+        """Create numeric DataFrame for comparisons."""
+        return pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [1.0, 2.0, 3.0, 4.0, 5.0],
+            "MSFT": [5.0, 4.0, 3.0, 2.0, 1.0],
+        })
+
+    def test_and_(self, bool_df_a: pl.DataFrame, bool_df_b: pl.DataFrame) -> None:
+        """Test logical AND."""
+        result = and_(bool_df_a, bool_df_b)
+        assert result.columns == bool_df_a.columns
+        # AAPL: [T&T, F&T, T&T, F&F, T&F] = [T, F, T, F, F]
+        assert result["AAPL"][0] is True
+        assert result["AAPL"][1] is False
+        assert result["AAPL"][2] is True
+        assert result["AAPL"][3] is False
+        assert result["AAPL"][4] is False
+
+    def test_or_(self, bool_df_a: pl.DataFrame, bool_df_b: pl.DataFrame) -> None:
+        """Test logical OR."""
+        result = or_(bool_df_a, bool_df_b)
+        # AAPL: [T|T, F|T, T|T, F|F, T|F] = [T, T, T, F, T]
+        assert result["AAPL"][0] is True
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is True
+        assert result["AAPL"][3] is False
+        assert result["AAPL"][4] is True
+
+    def test_not_(self, bool_df_a: pl.DataFrame) -> None:
+        """Test logical NOT."""
+        result = not_(bool_df_a)
+        # AAPL: [~T, ~F, ~T, ~F, ~T] = [F, T, F, T, F]
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is False
+        assert result["AAPL"][3] is True
+        assert result["AAPL"][4] is False
+
+    def test_if_else_df_df(self, bool_df_a: pl.DataFrame) -> None:
+        """Test if_else with DataFrame then/else."""
+        then_df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [100.0, 100.0, 100.0, 100.0, 100.0],
+            "MSFT": [200.0, 200.0, 200.0, 200.0, 200.0],
+        })
+        else_df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [0.0, 0.0, 0.0, 0.0, 0.0],
+            "MSFT": [0.0, 0.0, 0.0, 0.0, 0.0],
+        })
+        result = if_else(bool_df_a, then_df, else_df)
+        # AAPL cond: [T, F, T, F, T] -> [100, 0, 100, 0, 100]
+        assert result["AAPL"][0] == 100.0
+        assert result["AAPL"][1] == 0.0
+        assert result["AAPL"][2] == 100.0
+        assert result["AAPL"][3] == 0.0
+        assert result["AAPL"][4] == 100.0
+
+    def test_if_else_scalar(self, bool_df_a: pl.DataFrame) -> None:
+        """Test if_else with scalar then/else."""
+        result = if_else(bool_df_a, 1.0, 0.0)
+        # AAPL cond: [T, F, T, F, T] -> [1, 0, 1, 0, 1]
+        assert result["AAPL"][0] == 1.0
+        assert result["AAPL"][1] == 0.0
+        assert result["AAPL"][2] == 1.0
+
+    def test_is_nan_null(self) -> None:
+        """Test is_nan with null values."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [1.0, None, 3.0, None, 5.0],
+        })
+        result = is_nan(df)
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is False
+        assert result["AAPL"][3] is True
+        assert result["AAPL"][4] is False
+
+    def test_is_nan_float_nan(self) -> None:
+        """Test is_nan with float NaN values."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "AAPL": [1.0, float("nan"), 3.0],
+        })
+        result = is_nan(df)
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is False
+
+    def test_lt(self, numeric_df: pl.DataFrame) -> None:
+        """Test less than comparison."""
+        result = lt(numeric_df, 3.0)
+        # AAPL: [1<3, 2<3, 3<3, 4<3, 5<3] = [T, T, F, F, F]
+        assert result["AAPL"][0] is True
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is False
+        assert result["AAPL"][3] is False
+        assert result["AAPL"][4] is False
+
+    def test_le(self, numeric_df: pl.DataFrame) -> None:
+        """Test less than or equal comparison."""
+        result = le(numeric_df, 3.0)
+        # AAPL: [1<=3, 2<=3, 3<=3, 4<=3, 5<=3] = [T, T, T, F, F]
+        assert result["AAPL"][0] is True
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is True
+        assert result["AAPL"][3] is False
+        assert result["AAPL"][4] is False
+
+    def test_gt(self, numeric_df: pl.DataFrame) -> None:
+        """Test greater than comparison."""
+        result = gt(numeric_df, 3.0)
+        # AAPL: [1>3, 2>3, 3>3, 4>3, 5>3] = [F, F, F, T, T]
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is False
+        assert result["AAPL"][2] is False
+        assert result["AAPL"][3] is True
+        assert result["AAPL"][4] is True
+
+    def test_ge(self, numeric_df: pl.DataFrame) -> None:
+        """Test greater than or equal comparison."""
+        result = ge(numeric_df, 3.0)
+        # AAPL: [1>=3, 2>=3, 3>=3, 4>=3, 5>=3] = [F, F, T, T, T]
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is False
+        assert result["AAPL"][2] is True
+        assert result["AAPL"][3] is True
+        assert result["AAPL"][4] is True
+
+    def test_eq(self, numeric_df: pl.DataFrame) -> None:
+        """Test equality comparison."""
+        result = eq(numeric_df, 3.0)
+        # AAPL: [1==3, 2==3, 3==3, 4==3, 5==3] = [F, F, T, F, F]
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is False
+        assert result["AAPL"][2] is True
+        assert result["AAPL"][3] is False
+        assert result["AAPL"][4] is False
+
+    def test_ne(self, numeric_df: pl.DataFrame) -> None:
+        """Test not equal comparison."""
+        result = ne(numeric_df, 3.0)
+        # AAPL: [1!=3, 2!=3, 3!=3, 4!=3, 5!=3] = [T, T, F, T, T]
+        assert result["AAPL"][0] is True
+        assert result["AAPL"][1] is True
+        assert result["AAPL"][2] is False
+        assert result["AAPL"][3] is True
+        assert result["AAPL"][4] is True
+
+    def test_comparison_df_vs_df(self, numeric_df: pl.DataFrame) -> None:
+        """Test comparison between two DataFrames."""
+        other_df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "AAPL": [2.0, 2.0, 2.0, 2.0, 2.0],
+            "MSFT": [3.0, 3.0, 3.0, 3.0, 3.0],
+        })
+        result = gt(numeric_df, other_df)
+        # AAPL: [1>2, 2>2, 3>2, 4>2, 5>2] = [F, F, T, T, T]
+        assert result["AAPL"][0] is False
+        assert result["AAPL"][1] is False
+        assert result["AAPL"][2] is True
+        assert result["AAPL"][3] is True
+        assert result["AAPL"][4] is True
+
+    def test_null_propagation(self) -> None:
+        """Test that null propagates in comparisons."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "AAPL": [1.0, None, 3.0],
+        })
+        result = lt(df, 2.0)
+        # null comparisons return null
+        assert result["AAPL"][0] is True
+        assert result["AAPL"][1] is None
+        assert result["AAPL"][2] is False
+
+
+# =============================================================================
+# VECTOR OPERATORS
+# =============================================================================
+
+
+class TestVectorOperators:
+    """Vector operator tests."""
+
+    @pytest.fixture
+    def vector_df(self) -> pl.DataFrame:
+        return pl.DataFrame({
+            "timestamp": [date(2024, 1, 1), date(2024, 1, 2)],
+            "AAPL": [[2.0, 3.0, 5.0, 6.0, 3.0, 8.0, 10.0], [1.0, 2.0, 3.0]],
+            "MSFT": [[10.0, 20.0], [5.0, None, 10.0]],
+        })
+
+    def test_vec_avg(self, vector_df: pl.DataFrame) -> None:
+        """Test vector mean."""
+        result = vec_avg(vector_df)
+        assert result.columns == vector_df.columns
+        assert abs(result["AAPL"][0] - 5.2857) < 0.01  # 37/7
+        assert abs(result["AAPL"][1] - 2.0) < 0.01    # 6/3
+
+    def test_vec_sum(self, vector_df: pl.DataFrame) -> None:
+        """Test vector sum."""
+        result = vec_sum(vector_df)
+        assert result["AAPL"][0] == 37.0
+        assert result["AAPL"][1] == 6.0
+
+    def test_vec_avg_with_nulls(self, vector_df: pl.DataFrame) -> None:
+        """Test vec_avg ignores nulls in list."""
+        result = vec_avg(vector_df)
+        # MSFT[1] has None in list - Polars list.mean() ignores nulls
+        assert abs(result["MSFT"][1] - 7.5) < 0.01
+
+
+# =============================================================================
+# GROUP OPERATORS
+# =============================================================================
+
+
+class TestGroupOperators:
+    """Group operator tests."""
+
+    @pytest.fixture
+    def group_df(self) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """Create sample data with group assignments."""
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, 20.0, 30.0],
+            "B": [15.0, 25.0, 35.0],
+            "C": [100.0, 200.0, 300.0],
+            "D": [150.0, 250.0, 350.0],
+        })
+        group = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": ["tech", "tech", "tech"],
+            "B": ["tech", "tech", "tech"],
+            "C": ["fin", "fin", "fin"],
+            "D": ["fin", "fin", "fin"],
+        })
+        return x, group
+
+    def test_group_neutralize(self, group_df: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test group neutralization subtracts group mean."""
+        x, group = group_df
+        result = group_neutralize(x, group)
+
+        # tech group at row 0: A=10, B=15, mean=12.5
+        # A -> 10-12.5 = -2.5, B -> 15-12.5 = 2.5
+        assert abs(result["A"][0] - (-2.5)) < 0.01
+        assert abs(result["B"][0] - 2.5) < 0.01
+
+        # fin group at row 0: C=100, D=150, mean=125
+        # C -> 100-125 = -25, D -> 150-125 = 25
+        assert abs(result["C"][0] - (-25.0)) < 0.01
+        assert abs(result["D"][0] - 25.0) < 0.01
+
+    def test_group_zscore(self, group_df: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test group z-score."""
+        x, group = group_df
+        result = group_zscore(x, group)
+
+        # Z-scores within each group should sum to ~0
+        for i in range(len(result)):
+            tech_sum = result["A"][i] + result["B"][i]
+            fin_sum = result["C"][i] + result["D"][i]
+            assert abs(tech_sum) < 0.01
+            assert abs(fin_sum) < 0.01
+
+    def test_group_scale(self, group_df: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test group min-max scaling to [0, 1]."""
+        x, group = group_df
+        result = group_scale(x, group)
+
+        # Min should be 0, max should be 1 within each group
+        for i in range(len(result)):
+            # tech: min(A,B)=0, max(A,B)=1
+            assert result["A"][i] == 0.0
+            assert result["B"][i] == 1.0
+            # fin: min(C,D)=0, max(C,D)=1
+            assert result["C"][i] == 0.0
+            assert result["D"][i] == 1.0
+
+    def test_group_rank(self, group_df: tuple[pl.DataFrame, pl.DataFrame]) -> None:
+        """Test group rank in [0, 1]."""
+        x, group = group_df
+        result = group_rank(x, group)
+
+        # tech: A < B, ranks: A=0, B=1
+        assert result["A"][0] == 0.0
+        assert result["B"][0] == 1.0
+        # fin: C < D, ranks: C=0, D=1
+        assert result["C"][0] == 0.0
+        assert result["D"][0] == 1.0
+
+    def test_group_rank_single_member(self) -> None:
+        """Test single-member group returns 0.5."""
+        x = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [10.0],
+            "B": [20.0],
+        })
+        group = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": ["grp1"],
+            "B": ["grp2"],
+        })
+        result = group_rank(x, group)
+        assert result["A"][0] == 0.5
+        assert result["B"][0] == 0.5
+
+    def test_group_mean(self) -> None:
+        """Test weighted mean within groups."""
+        x = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [10.0],
+            "B": [20.0],
+            "C": [100.0],
+        })
+        weight = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [1.0],
+            "B": [3.0],
+            "C": [1.0],
+        })
+        group = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": ["tech"],
+            "B": ["tech"],
+            "C": ["fin"],
+        })
+        result = group_mean(x, weight, group)
+
+        # tech: (10*1 + 20*3) / (1+3) = 70/4 = 17.5
+        assert abs(result["A"][0] - 17.5) < 0.01
+        assert abs(result["B"][0] - 17.5) < 0.01
+        # fin: (100*1) / 1 = 100
+        assert abs(result["C"][0] - 100.0) < 0.01
+
+    def test_group_backfill(self) -> None:
+        """Test filling NaN with winsorized group mean."""
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, None, 30.0],
+            "B": [20.0, 25.0, 35.0],
+            "C": [100.0, 200.0, None],
+        })
+        group = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": ["tech", "tech", "tech"],
+            "B": ["tech", "tech", "tech"],
+            "C": ["fin", "fin", "fin"],
+        })
+        result = group_backfill(x, group, d=3)
+
+        # A[1] was None, should be filled with tech group mean
+        assert result["A"][1] is not None
+        assert result["A"][0] == 10.0
+        assert result["B"][1] == 25.0
+
+    def test_group_backfill_all_nan(self) -> None:
+        """Test all-NaN window keeps NaN."""
+        x = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [None, None, None],
+            "B": [None, None, None],
+        })
+        group = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": ["grp1", "grp1", "grp1"],
+            "B": ["grp1", "grp1", "grp1"],
+        })
+        result = group_backfill(x, group, d=3)
+
+        # All NaN in group, should stay NaN
+        assert result["A"][2] is None
+        assert result["B"][2] is None
+
+    def test_group_scale_all_same(self) -> None:
+        """Test all same values returns NaN for scale."""
+        x = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+            "B": [5.0],
+        })
+        group = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": ["grp1"],
+            "B": ["grp1"],
+        })
+        result = group_scale(x, group)
+        # (5-5)/(5-5) = 0/0 = NaN
+        assert result["A"][0] is None or math.isnan(result["A"][0])
+
+    def test_group_zscore_all_same(self) -> None:
+        """Test all same values returns NaN for zscore."""
+        x = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+            "B": [5.0],
+        })
+        group = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": ["grp1"],
+            "B": ["grp1"],
+        })
+        result = group_zscore(x, group)
+        # std=0, (5-5)/0 = NaN
+        assert result["A"][0] is None or math.isnan(result["A"][0])
+
+    def test_group_rank_all_same(self) -> None:
+        """Test all same values returns values in [0,1]."""
+        x = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+            "B": [5.0],
+        })
+        group = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": ["grp1"],
+            "B": ["grp1"],
+        })
+        result = group_rank(x, group)
+        # Two values but same, ordinal rank gives 0.0 and 1.0
+        assert 0.0 <= result["A"][0] <= 1.0
+        assert 0.0 <= result["B"][0] <= 1.0
+
+
+# =============================================================================
+# TRANSFORMATIONAL OPERATORS
+# =============================================================================
+
+
+class TestBucketOperator:
+    """Tests for bucket operator."""
+
+    def test_bucket_with_range(self) -> None:
+        """Test bucket with range parameter."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [-5.0, 1.0, 5.0, 7.0, 15.0],
+        })
+        result = bucket(df, range_spec="0,10,2")
+        # boundaries: 0, 2, 4, 6, 8, 10
+        # buckets: (-inf,0]=0, (0,2]=1, (2,4]=2, (4,6]=3, (6,8]=4, (8,10]=5, (10,inf)=6
+        # -5 -> 0 (hidden begin), 1 -> 1, 5 -> 3, 7 -> 4, 15 -> 6 (hidden end)
+        assert result["A"][0] == 0  # -5 in (-inf, 0]
+        assert result["A"][1] == 1  # 1 in (0, 2]
+        assert result["A"][2] == 3  # 5 in (4, 6]
+        assert result["A"][3] == 4  # 7 in (6, 8]
+        assert result["A"][4] == 6  # 15 in (10, inf)
+
+    def test_bucket_with_buckets(self) -> None:
+        """Test bucket with explicit buckets parameter."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 4), eager=True),
+            "A": [0.5, 3.0, 7.0, 25.0],
+        })
+        result = bucket(df, buckets="0,5,10,20")
+        # buckets: (-inf,0]=0, (0,5]=1, (5,10]=2, (10,20]=3, (20,inf)=4
+        assert result["A"][0] == 1  # 0.5 in (0, 5]
+        assert result["A"][1] == 1  # 3.0 in (0, 5]
+        assert result["A"][2] == 2  # 7.0 in (5, 10]
+        assert result["A"][3] == 4  # 25.0 in (20, inf)
+
+    def test_bucket_skip_begin(self) -> None:
+        """Test bucket with skipBegin=True."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [-5.0, 5.0, 15.0],
+        })
+        result = bucket(df, range_spec="0,10,5", skipBegin=True)
+        # boundaries: 0, 5, 10 (no hidden begin bucket)
+        # buckets: (0,5]=0, (5,10]=1, (10,inf)=2
+        assert result["A"][0] is None  # -5 not in any bucket
+        assert result["A"][1] == 0  # 5 in (0, 5]
+        assert result["A"][2] == 2  # 15 in (10, inf)
+
+    def test_bucket_skip_end(self) -> None:
+        """Test bucket with skipEnd=True."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [-5.0, 5.0, 15.0],
+        })
+        result = bucket(df, range_spec="0,10,5", skipEnd=True)
+        # boundaries: 0, 5, 10 (no hidden end bucket)
+        # buckets: (-inf,0]=0, (0,5]=1, (5,10]=2
+        assert result["A"][0] == 0  # -5 in (-inf, 0]
+        assert result["A"][1] == 1  # 5 in (0, 5]
+        assert result["A"][2] is None  # 15 not in any bucket
+
+    def test_bucket_skip_both(self) -> None:
+        """Test bucket with skipBoth=True."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [-5.0, 5.0, 15.0],
+        })
+        result = bucket(df, range_spec="0,10,5", skipBoth=True)
+        # boundaries: 0, 5, 10 (no hidden buckets)
+        # buckets: (0,5]=0, (5,10]=1
+        assert result["A"][0] is None  # -5 not in any bucket
+        assert result["A"][1] == 0  # 5 in (0, 5]
+        assert result["A"][2] is None  # 15 not in any bucket
+
+    def test_bucket_nan_group(self) -> None:
+        """Test bucket with NANGroup=True."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [None, 5.0, float("nan")],
+        })
+        result = bucket(df, range_spec="0,10,5", NANGroup=True)
+        # Last idx without NANGroup is 3, so NaN -> 4
+        assert result["A"][0] == 4  # None -> NaN group
+        assert result["A"][1] == 1  # 5 in (0, 5]
+        assert result["A"][2] == 4  # NaN -> NaN group
+
+    def test_bucket_nan_no_group(self) -> None:
+        """Test bucket without NANGroup (default)."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
+            "A": [None, 5.0],
+        })
+        result = bucket(df, range_spec="0,10,5")
+        assert result["A"][0] is None  # None stays None
+        assert result["A"][1] == 1  # 5 in (0, 5]
+
+    def test_bucket_boundary_value(self) -> None:
+        """Test bucket boundary inclusion (left-open, right-closed)."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [0.0, 5.0, 10.0],
+        })
+        result = bucket(df, range_spec="0,10,5")
+        # (lower, upper] inclusion
+        # 0 is boundary -> in (-inf, 0] (bucket 0)
+        # 5 is boundary -> in (0, 5] (bucket 1)
+        # 10 is boundary -> in (5, 10] (bucket 2)
+        assert result["A"][0] == 0  # 0 in (-inf, 0]
+        assert result["A"][1] == 1  # 5 in (0, 5]
+        assert result["A"][2] == 2  # 10 in (5, 10]
+
+    def test_bucket_returns_int64(self) -> None:
+        """Test bucket returns Int64 type."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
+            "A": [1.0, 5.0],
+        })
+        result = bucket(df, range_spec="0,10,5")
+        assert result["A"].dtype == pl.Int64
+
+    def test_bucket_error_no_spec(self) -> None:
+        """Test bucket raises error when no spec provided."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+        })
+        with pytest.raises(InvalidBucketSpecError):
+            bucket(df)
+
+    def test_bucket_error_both_specs(self) -> None:
+        """Test bucket raises error when both specs provided."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+        })
+        with pytest.raises(InvalidBucketSpecError):
+            bucket(df, range_spec="0,10,2", buckets="0,5,10")
+
+    def test_bucket_error_invalid_range(self) -> None:
+        """Test bucket raises error for invalid range format."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+        })
+        with pytest.raises(InvalidBucketSpecError):
+            bucket(df, range_spec="0,10")  # Missing step
+
+    def test_bucket_error_negative_step(self) -> None:
+        """Test bucket raises error for negative step."""
+        df = pl.DataFrame({
+            "timestamp": [date(2024, 1, 1)],
+            "A": [5.0],
+        })
+        with pytest.raises(InvalidBucketSpecError):
+            bucket(df, range_spec="0,10,-2")
+
+    def test_bucket_multiple_columns(self) -> None:
+        """Test bucket with multiple columns."""
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
+            "A": [1.0, 6.0],
+            "B": [3.0, 12.0],
+        })
+        result = bucket(df, range_spec="0,10,5")
+        assert result["A"][0] == 1  # 1 in (0, 5]
+        assert result["A"][1] == 2  # 6 in (5, 10]
+        assert result["B"][0] == 1  # 3 in (0, 5]
+        assert result["B"][1] == 3  # 12 in (10, inf)
+
+
+class TestTradeWhenOperator:
+    """Tests for trade_when operator."""
+
+    def test_trade_when_basic(self) -> None:
+        """Test basic trade_when behavior."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 0.0, 0.0, 0.0, 0.0],  # Enter on day 1
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [10.0, 11.0, 12.0, 13.0, 14.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [0.0, 0.0, 0.0, 0.0, 0.0],  # No exit
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] == 10.0  # Enter with alpha
+        assert result["A"][1] == 10.0  # Hold
+        assert result["A"][2] == 10.0  # Hold
+        assert result["A"][3] == 10.0  # Hold
+        assert result["A"][4] == 10.0  # Hold
+
+    def test_trade_when_exit(self) -> None:
+        """Test trade_when with exit trigger."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 0.0, 0.0, 0.0, 0.0],  # Enter on day 1
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [10.0, 11.0, 12.0, 13.0, 14.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [0.0, 0.0, 1.0, 0.0, 0.0],  # Exit on day 3
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] == 10.0  # Enter
+        assert result["A"][1] == 10.0  # Hold
+        assert result["A"][2] is None  # Exit -> NaN
+        assert result["A"][3] is None  # Stay out
+        assert result["A"][4] is None  # Stay out
+
+    def test_trade_when_reenter(self) -> None:
+        """Test trade_when re-entering after exit."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [1.0, 0.0, 0.0, 1.0, 0.0],  # Enter day 1, re-enter day 4
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [10.0, 11.0, 12.0, 13.0, 14.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
+            "A": [0.0, 0.0, 1.0, 0.0, 0.0],  # Exit day 3
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] == 10.0  # Enter
+        assert result["A"][1] == 10.0  # Hold
+        assert result["A"][2] is None  # Exit
+        assert result["A"][3] == 13.0  # Re-enter
+        assert result["A"][4] == 13.0  # Hold
+
+    def test_trade_when_exit_priority(self) -> None:
+        """Test that exit wins over trigger when both > 0."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [1.0, 1.0, 0.0],  # Trigger on days 1 and 2
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, 11.0, 12.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [0.0, 1.0, 0.0],  # Exit on day 2 (same time as trigger)
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] == 10.0  # Enter
+        assert result["A"][1] is None  # Exit wins over trigger
+        assert result["A"][2] is None  # Stay out
+
+    def test_trade_when_no_initial_trigger(self) -> None:
+        """Test trade_when when no initial trigger fires."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [0.0, 0.0, 1.0],  # No trigger until day 3
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, 11.0, 12.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [0.0, 0.0, 0.0],
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] is None  # No position
+        assert result["A"][1] is None  # No position
+        assert result["A"][2] == 12.0  # Enter
+
+    def test_trade_when_multiple_columns(self) -> None:
+        """Test trade_when with multiple columns."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [1.0, 0.0, 0.0],
+            "B": [0.0, 1.0, 0.0],
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, 11.0, 12.0],
+            "B": [20.0, 21.0, 22.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [0.0, 0.0, 0.0],
+            "B": [0.0, 0.0, 0.0],
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] == 10.0
+        assert result["A"][1] == 10.0
+        assert result["A"][2] == 10.0
+        assert result["B"][0] is None
+        assert result["B"][1] == 21.0
+        assert result["B"][2] == 21.0
+
+    def test_trade_when_with_null_trigger(self) -> None:
+        """Test trade_when with null trigger values."""
+        trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [1.0, None, 0.0],
+        })
+        alpha = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [10.0, 11.0, 12.0],
+        })
+        exit_trigger = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
+            "A": [0.0, 0.0, 0.0],
+        })
+        result = trade_when(trigger, alpha, exit_trigger)
+        assert result["A"][0] == 10.0  # Enter
+        assert result["A"][1] == 10.0  # None trigger = hold
+        assert result["A"][2] == 10.0  # Hold
+
+
+# =============================================================================
+# OPERATOR COMPOSITION
+# =============================================================================
+
+
 class TestOperatorComposition:
     """Test composing operators."""
 
@@ -515,6 +1739,11 @@ class TestOperatorComposition:
         for i in range(len(scaled)):
             row_sum = scaled["AAPL"][i] + scaled["MSFT"][i] + scaled["GOOGL"][i]
             assert abs(row_sum) < 0.01
+
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
 
 
 class TestTsRegressionRetTypes:

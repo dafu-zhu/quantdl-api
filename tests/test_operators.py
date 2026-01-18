@@ -8,7 +8,7 @@ import pytest
 
 from quantdl.exceptions import InvalidBucketSpecError
 from quantdl.operators import (
-    abs,
+    abs as op_abs,
     add,
     and_,
     bucket,
@@ -33,8 +33,8 @@ from quantdl.operators import (
     le,
     log,
     lt,
-    max,
-    min,
+    max as op_max,
+    min as op_min,
     multiply,
     ne,
     normalize,
@@ -567,7 +567,7 @@ class TestArithmeticOperators:
 
     def test_abs_basic(self, arith_df: pl.DataFrame) -> None:
         """Test absolute value computation."""
-        result = abs(arith_df)
+        result = op_abs(arith_df)
         assert result.columns == arith_df.columns
         assert result["AAPL"][0] == 100.0
         assert result["AAPL"][1] == 50.0  # |-50| = 50
@@ -718,7 +718,7 @@ class TestArithmeticOperators:
 
     def test_max_two_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
         """Test element-wise max of two DataFrames."""
-        result = max(arith_df, arith_df2)
+        result = op_max(arith_df, arith_df2)
         assert result["AAPL"][0] == 100.0  # max(100, 10)
         assert result["AAPL"][1] == 5.0  # max(-50, 5)
         assert result["GOOGL"][0] == -30.0  # max(-150, -30)
@@ -728,17 +728,17 @@ class TestArithmeticOperators:
         df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [1.0]})
         df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
         df3 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [3.0]})
-        result = max(df1, df2, df3)
+        result = op_max(df1, df2, df3)
         assert result["A"][0] == 5.0
 
     def test_max_requires_two_inputs(self, arith_df: pl.DataFrame) -> None:
         """Test max raises error with less than 2 inputs."""
         with pytest.raises(ValueError, match="at least 2"):
-            max(arith_df)
+            op_max(arith_df)
 
     def test_min_two_inputs(self, arith_df: pl.DataFrame, arith_df2: pl.DataFrame) -> None:
         """Test element-wise min of two DataFrames."""
-        result = min(arith_df, arith_df2)
+        result = op_min(arith_df, arith_df2)
         assert result["AAPL"][0] == 10.0  # min(100, 10)
         assert result["AAPL"][1] == -50.0  # min(-50, 5)
         assert result["GOOGL"][0] == -150.0  # min(-150, -30)
@@ -748,13 +748,13 @@ class TestArithmeticOperators:
         df1 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [1.0]})
         df2 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [5.0]})
         df3 = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": [3.0]})
-        result = min(df1, df2, df3)
+        result = op_min(df1, df2, df3)
         assert result["A"][0] == 1.0
 
     def test_min_requires_two_inputs(self, arith_df: pl.DataFrame) -> None:
         """Test min raises error with less than 2 inputs."""
         with pytest.raises(ValueError, match="at least 2"):
-            min(arith_df)
+            op_min(arith_df)
 
     def test_power_basic(self) -> None:
         """Test basic power computation."""
@@ -913,7 +913,7 @@ class TestArithmeticOperators:
     def test_abs_with_null(self) -> None:
         """Test abs_ preserves nulls."""
         df = pl.DataFrame({"timestamp": [date(2024, 1, 1)], "A": pl.Series([None], dtype=pl.Float64)})
-        result = abs(df)
+        result = op_abs(df)
         assert result["A"][0] is None
 
     def test_sqrt_with_null(self) -> None:

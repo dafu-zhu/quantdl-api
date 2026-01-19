@@ -1,0 +1,45 @@
+"""
+subtract - Element-wise subtraction
+
+When to use:
+    Use subtract() to compute differences between two DataFrames.
+    Useful for spread calculations, momentum differences, etc.
+
+Parameters:
+    x: First DataFrame (minuend)
+    y: Second DataFrame (subtrahend)
+
+Example output:
+    Difference between short and long momentum
+"""
+from dotenv import load_dotenv
+load_dotenv()
+
+from quantdl import QuantDLClient
+from quantdl.operators import ts_delta, subtract
+
+# Initialize client
+client = QuantDLClient()
+
+# Fetch price data
+symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
+prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
+
+# Calculate different momentum periods
+momentum_5d = ts_delta(prices, 5)
+momentum_10d = ts_delta(prices, 10)
+
+# Compute momentum spread
+momentum_spread = subtract(momentum_5d, momentum_10d)
+
+print("subtract() - Element-wise subtraction")
+print("=" * 50)
+print("\n5-day momentum:")
+print(momentum_5d.tail(3))
+print("\n10-day momentum:")
+print(momentum_10d.tail(3))
+print("\nMomentum spread (5d - 10d):")
+print(momentum_spread.tail(3))
+
+# Cleanup
+client.close()

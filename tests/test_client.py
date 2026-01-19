@@ -105,13 +105,13 @@ class TestMetrics:
             client.metrics("INVALID", "pe_ratio", "2024-01-01", "2024-12-31")
 
 
-class TestDailyFieldNotFound:
-    """Tests for daily field not found error."""
+class TestTicksFieldNotFound:
+    """Tests for ticks field not found error."""
 
-    def test_daily_field_not_found(self, client: QuantDLClient) -> None:
-        """Test daily with invalid field raises DataNotFoundError."""
+    def test_ticks_field_not_found(self, client: QuantDLClient) -> None:
+        """Test ticks with invalid field raises DataNotFoundError."""
         with pytest.raises(DataNotFoundError) as exc_info:
-            client.daily("AAPL", field="nonexistent_field", start="2024-01-01", end="2024-01-10")
+            client.ticks("AAPL", field="nonexistent_field", start="2024-01-01", end="2024-01-10")
         assert "field=nonexistent_field" in str(exc_info.value)
 
 

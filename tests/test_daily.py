@@ -1,4 +1,4 @@
-"""Tests for daily data API."""
+"""Tests for ticks (daily) data API."""
 
 from datetime import date
 from pathlib import Path
@@ -20,11 +20,11 @@ def client(test_data_dir: Path, temp_cache_dir: str) -> QuantDLClient:
 
 
 class TestDailyAPI:
-    """Tests for client.daily() method."""
+    """Tests for client.ticks() method."""
 
     def test_daily_single_symbol(self, client: QuantDLClient) -> None:
         """Test fetching daily data for single symbol."""
-        df = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+        df = client.ticks("AAPL", "close", "2024-01-01", "2024-01-10")
 
         assert "timestamp" in df.columns
         assert "AAPL" in df.columns
@@ -33,14 +33,14 @@ class TestDailyAPI:
     def test_daily_multiple_symbols(self, client: QuantDLClient) -> None:
         """Test fetching daily data for multiple symbols."""
         # Note: Only AAPL has test data in conftest
-        df = client.daily(["AAPL"], "close", "2024-01-01", "2024-01-10")
+        df = client.ticks(["AAPL"], "close", "2024-01-01", "2024-01-10")
 
         assert "timestamp" in df.columns
         assert "AAPL" in df.columns
 
     def test_daily_wide_format(self, client: QuantDLClient) -> None:
-        """Test that daily returns wide format."""
-        df = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+        """Test that ticks returns wide format."""
+        df = client.ticks("AAPL", "close", "2024-01-01", "2024-01-10")
 
         # First column is timestamp
         assert df.columns[0] == "timestamp"
@@ -49,7 +49,7 @@ class TestDailyAPI:
 
     def test_daily_sorted_by_date(self, client: QuantDLClient) -> None:
         """Test that daily data is sorted by date."""
-        df = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+        df = client.ticks("AAPL", "close", "2024-01-01", "2024-01-10")
 
         dates = df["timestamp"].to_list()
         assert dates == sorted(dates)
@@ -57,17 +57,17 @@ class TestDailyAPI:
     def test_daily_field_options(self, client: QuantDLClient) -> None:
         """Test different price fields."""
         for field in ["open", "high", "low", "close", "volume"]:
-            df = client.daily("AAPL", field, "2024-01-01", "2024-01-10")
+            df = client.ticks("AAPL", field, "2024-01-01", "2024-01-10")
             assert len(df) > 0
 
     def test_daily_invalid_symbol(self, client: QuantDLClient) -> None:
         """Test fetching data for invalid symbol."""
         with pytest.raises(DataNotFoundError):
-            client.daily("INVALID_SYMBOL", "close", "2024-01-01", "2024-01-10")
+            client.ticks("INVALID_SYMBOL", "close", "2024-01-01", "2024-01-10")
 
     def test_daily_date_filtering(self, client: QuantDLClient) -> None:
         """Test date range filtering."""
-        df = client.daily("AAPL", "close", "2024-01-03", "2024-01-05")
+        df = client.ticks("AAPL", "close", "2024-01-03", "2024-01-05")
 
         dates = df["timestamp"].to_list()
         for d in dates:
@@ -76,25 +76,25 @@ class TestDailyAPI:
 
 
 class TestDailyCaching:
-    """Tests for daily data caching."""
+    """Tests for ticks data caching."""
 
     def test_daily_uses_cache(self, client: QuantDLClient) -> None:
         """Test that second request uses cache."""
         # First request
-        df1 = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+        df1 = client.ticks("AAPL", "close", "2024-01-01", "2024-01-10")
 
         # Check cache stats
         stats = client.cache_stats()
         assert stats["entries"] >= 1
 
         # Second request should use cache
-        df2 = client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+        df2 = client.ticks("AAPL", "close", "2024-01-01", "2024-01-10")
 
         assert df1.equals(df2)
 
     def test_clear_cache(self, client: QuantDLClient) -> None:
         """Test cache clearing."""
-        client.daily("AAPL", "close", "2024-01-01", "2024-01-10")
+        client.ticks("AAPL", "close", "2024-01-01", "2024-01-10")
 
         client.clear_cache()
         stats = client.cache_stats()

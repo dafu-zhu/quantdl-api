@@ -476,3 +476,83 @@ class TestBooleanOperations:
         assert result.data["A"][0] == 1.0  # 0 < 50 < 100
         assert result.data["A"][1] == 0.0  # 0 < 100 < 100 is False
         assert result.data["A"][2] == 0.0  # 0 < 150 < 100 is False
+
+
+class TestCleanSyntax:
+    """Tests for clean syntax without ops. prefix (GP/RL friendly)."""
+
+    def test_ts_delta_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test ts_delta without ops. prefix."""
+        result = alpha_eval("ts_delta(close, 1)", {"close": wide_df}, ops=ops)
+        assert result.data["AAPL"][0] is None  # First diff is null
+        assert result.data["AAPL"][1] == 2.0   # 102 - 100
+
+    def test_rank_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test rank without ops. prefix."""
+        result = alpha_eval("rank(close, rate=0)", {"close": wide_df}, ops=ops)
+        # AAPL < MSFT so AAPL rank = 0, MSFT rank = 1
+        assert result.data["AAPL"][0] == 0.0
+        assert result.data["MSFT"][0] == 1.0
+
+    def test_nested_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test nested operators without ops. prefix."""
+        result = alpha_eval(
+            "rank(-ts_delta(close, 1))",
+            {"close": wide_df},
+            ops=ops,
+        )
+        assert result is not None
+        assert result.data.columns == wide_df.columns
+
+    def test_ts_mean_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test ts_mean without ops. prefix."""
+        result = alpha_eval("ts_mean(close, 3)", {"close": wide_df}, ops=ops)
+        assert result is not None
+        # First 2 values should be null (need 3 values for window)
+        assert result.data["AAPL"][0] is None
+        assert result.data["AAPL"][1] is None
+        # Third value: avg(100, 102, 101) = 101
+        assert result.data["AAPL"][2] == 101.0
+
+    def test_zscore_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test zscore without ops. prefix."""
+        result = alpha_eval("zscore(close)", {"close": wide_df}, ops=ops)
+        assert result is not None
+        # Row-wise z-score: AAPL < MSFT so AAPL is negative, MSFT is positive
+        assert result.data["AAPL"][0] < 0
+        assert result.data["MSFT"][0] > 0
+
+    def test_complex_alpha_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test complex alpha expression without ops. prefix."""
+        result = alpha_eval(
+            "scale(rank(ts_delta(close, 1)))",
+            {"close": wide_df},
+            ops=ops,
+        )
+        assert result is not None
+        assert result.data.columns == wide_df.columns
+
+    def test_mixed_syntax_backwards_compat(self, wide_df: pl.DataFrame) -> None:
+        """Test that ops.func still works (backward compatibility)."""
+        # Both should produce same result
+        result_old = alpha_eval("ops.ts_delta(close, 1)", {"close": wide_df}, ops=ops)
+        result_new = alpha_eval("ts_delta(close, 1)", {"close": wide_df}, ops=ops)
+        assert result_old.data["AAPL"][1] == result_new.data["AAPL"][1]
+
+    def test_ts_delay_clean(self, wide_df: pl.DataFrame) -> None:
+        """Test ts_delay without ops. prefix."""
+        result = alpha_eval("ts_delay(close, 1)", {"close": wide_df}, ops=ops)
+        assert result.data["AAPL"][0] is None  # First value shifted out
+        assert result.data["AAPL"][1] == 100.0  # Previous day's value
+
+    def test_ts_corr_clean(self, wide_df: pl.DataFrame, wide_df2: pl.DataFrame) -> None:
+        """Test ts_corr without ops. prefix."""
+        result = alpha_eval(
+            "ts_corr(x, y, 3)",
+            {"x": wide_df, "y": wide_df2},
+            ops=ops,
+        )
+        assert result is not None
+        # Correlation requires at least 3 periods
+        assert result.data["AAPL"][0] is None
+        assert result.data["AAPL"][1] is None

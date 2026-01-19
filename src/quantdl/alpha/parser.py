@@ -3,6 +3,10 @@
 Provides alpha_eval() for parsing string expressions like:
     alpha_eval("min(close, vwap)", {"close": close_df, "vwap": vwap_df})
     alpha_eval("rank(-ts_delta(close, 5))", {"close": close_df}, ops=quantdl.operators)
+
+For GP/RL alpha mining, operator functions are injected directly into the namespace,
+allowing clean expressions without 'ops.' prefix:
+    alpha_eval("rank(ts_delta(close, 5))", {"close": close_df}, ops=quantdl.operators)
 """
 
 from __future__ import annotations
@@ -148,7 +152,7 @@ class SafeEvaluator(ast.NodeVisitor):
     - Numeric literals
     - Binary/unary operators
     - Function calls (from ops namespace or builtins)
-    - Attribute access (for ops.func style)
+    - Attribute access (for ops.func style - backward compat)
     """
 
     def __init__(
@@ -164,6 +168,14 @@ class SafeEvaluator(ast.NodeVisitor):
         """
         self.variables = variables
         self.ops = ops
+        # Track which functions are operator functions (for Alpha unwrapping)
+        self._op_funcs: set[int] = set()
+        if ops is not None:
+            for name in dir(ops):
+                if not name.startswith('_'):
+                    func = getattr(ops, name, None)
+                    if callable(func):
+                        self._op_funcs.add(id(func))
 
     def visit_Expression(self, node: ast.Expression) -> Any:
         return self.visit(node.body)
@@ -188,6 +200,11 @@ class SafeEvaluator(ast.NodeVisitor):
             return val
         if name in _BUILTINS:
             return _BUILTINS[name]  # type: ignore[return-value]
+        # Check if it's an operator function (injected directly)
+        if self.ops is not None and hasattr(self.ops, name):
+            func = getattr(self.ops, name)
+            if callable(func):
+                return func  # type: ignore[return-value]
         raise AlphaParseError(f"Unknown variable: {name}")
 
     def visit_Attribute(self, node: ast.Attribute) -> Any:
@@ -245,10 +262,14 @@ class SafeEvaluator(ast.NodeVisitor):
         raise AlphaParseError(f"Unsupported bool op: {type(node.op).__name__}")
 
     def _is_ops_func(self, node: ast.AST) -> bool:
-        """Check if node is ops.func_name."""
+        """Check if node is ops.func_name (backward compat)."""
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
             return node.value.id == "ops"
         return False
+
+    def _is_operator_func(self, func: Any) -> bool:
+        """Check if func is an operator function (for Alpha unwrapping)."""
+        return id(func) in self._op_funcs
 
     def _unwrap_for_ops(self, val: Any) -> Any:
         """Unwrap Alpha to DataFrame for ops functions."""
@@ -261,8 +282,8 @@ class SafeEvaluator(ast.NodeVisitor):
         args = [self.visit(arg) for arg in node.args]
         kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords if kw.arg}
 
-        # If calling ops.*, unwrap Alpha to DataFrame
-        if self._is_ops_func(node.func):
+        # If calling operator function (directly or via ops.*), unwrap Alpha to DataFrame
+        if self._is_ops_func(node.func) or self._is_operator_func(func):
             args = [self._unwrap_for_ops(a) for a in args]
             kwargs = {k: self._unwrap_for_ops(v) for k, v in kwargs.items()}
             if callable(func):
@@ -335,24 +356,33 @@ def alpha_eval(
     """Evaluate alpha expression string safely.
 
     Uses AST parsing for safe evaluation without exec/eval.
+    Operator functions are available directly without 'ops.' prefix.
 
     Args:
         expr: Expression string, e.g., "rank(-ts_delta(close, 5))"
         variables: Mapping of variable names to Alpha/DataFrame values
-        ops: Module containing operator functions (accessed via ops.func_name)
+        ops: Module containing operator functions (e.g., quantdl.operators)
 
     Returns:
         Alpha with computed result
 
     Example:
         >>> import quantdl.operators as ops
+        >>> # Clean syntax (recommended for GP/RL):
+        >>> result = alpha_eval(
+        ...     "rank(-ts_delta(close, 5))",
+        ...     {"close": close_df},
+        ...     ops=ops,
+        ... )
+
+        >>> # Legacy syntax (still supported):
         >>> result = alpha_eval(
         ...     "ops.rank(-ops.ts_delta(close, 5))",
         ...     {"close": close_df},
         ...     ops=ops,
         ... )
 
-        >>> # Or with builtins
+        >>> # Builtins work without ops:
         >>> result = alpha_eval("min(close, vwap)", {"close": close_df, "vwap": vwap_df})
     """
     try:

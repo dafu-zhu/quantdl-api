@@ -28,7 +28,7 @@ class QuantDLClient:
         client = QuantDLClient()
 
         # Get daily prices as wide table
-        prices = client.daily(["AAPL", "MSFT", "GOOGL"], "close", "2024-01-01", "2024-12-31")
+        prices = client.ticks(["AAPL", "MSFT", "GOOGL"], "close", "2024-01-01", "2024-12-31")
 
         # Get fundamentals
         fundamentals = client.fundamentals(["AAPL"], "Revenue", "2024-01-01", "2024-12-31")
@@ -120,7 +120,7 @@ class QuantDLClient:
         calendar_df = pl.DataFrame({"timestamp": trading_days})
         return calendar_df.join(wide, on="timestamp", how="left").sort("timestamp")
 
-    def _fetch_daily_single(
+    def _fetch_ticks_single(
         self,
         security_id: str,
         start: date,
@@ -138,21 +138,21 @@ class QuantDLClient:
 
         # Fetch from S3
         try:
-            df = self._storage.read_parquet(
-                path,
-                filters=[
-                    pl.col("timestamp") >= start,
-                    pl.col("timestamp") <= end,
-                ],
+            df = self._storage.read_parquet(path)
+            # Cast timestamp to date if it's a string
+            if df.schema["timestamp"] == pl.String:
+                df = df.with_columns(pl.col("timestamp").str.to_date())
+            # Filter by date range
+            df = df.filter(
+                (pl.col("timestamp") >= start) & (pl.col("timestamp") <= end)
             )
             # Cache full file for future use
-            full_df = self._storage.read_parquet(path)
-            self._cache.put(path, full_df)
+            self._cache.put(path, df)
             return df
         except Exception:
             return None
 
-    async def _fetch_daily_async(
+    async def _fetch_ticks_async(
         self,
         securities: list[tuple[str, SecurityInfo]],
         start: date,
@@ -165,7 +165,7 @@ class QuantDLClient:
         for symbol, info in securities:
             task = loop.run_in_executor(
                 self._executor,
-                self._fetch_daily_single,
+                self._fetch_ticks_single,
                 info.security_id,
                 start,
                 end,
@@ -180,7 +180,7 @@ class QuantDLClient:
 
         return results
 
-    def daily(
+    def ticks(
         self,
         symbols: Sequence[str] | str,
         field: str = "close",
@@ -201,7 +201,7 @@ class QuantDLClient:
         Example:
             ```python
             # Returns DataFrame with columns: timestamp, AAPL, MSFT, GOOGL
-            prices = client.daily(["AAPL", "MSFT", "GOOGL"], "close")
+            prices = client.ticks(["AAPL", "MSFT", "GOOGL"], "close")
             ```
         """
         if isinstance(symbols, str):
@@ -219,13 +219,13 @@ class QuantDLClient:
         # Resolve symbols to security IDs
         resolved = self._resolve_securities(symbols, as_of=start)
         if not resolved:
-            raise DataNotFoundError("daily", ", ".join(symbols))
+            raise DataNotFoundError("ticks", ", ".join(symbols))
 
         # Fetch data concurrently
-        results = asyncio.run(self._fetch_daily_async(resolved, start, end))
+        results = asyncio.run(self._fetch_ticks_async(resolved, start, end))
 
         if not results:
-            raise DataNotFoundError("daily", ", ".join(symbols))
+            raise DataNotFoundError("ticks", ", ".join(symbols))
 
         # Build wide table
         dfs: list[pl.DataFrame] = []
@@ -241,7 +241,7 @@ class QuantDLClient:
             )
 
         if not dfs:
-            raise DataNotFoundError("daily", f"field={field}")
+            raise DataNotFoundError("ticks", f"field={field}")
 
         # Concat and pivot
         combined = pl.concat(dfs)
@@ -268,6 +268,9 @@ class QuantDLClient:
 
         try:
             df = self._storage.read_parquet(path)
+            # Cast as_of_date to date if it's a string
+            if df.schema["as_of_date"] == pl.String:
+                df = df.with_columns(pl.col("as_of_date").str.to_date())
             self._cache.put(path, df)
             return df.filter(
                 (pl.col("as_of_date") >= start) & (pl.col("as_of_date") <= end)
@@ -360,6 +363,8 @@ class QuantDLClient:
             raise DataNotFoundError("fundamentals", f"concept={concept}")
 
         combined = pl.concat(dfs)
+        # Deduplicate: take first value per (timestamp, symbol)
+        combined = combined.group_by(["timestamp", "symbol"]).agg(pl.col("value").first())
         wide = combined.pivot(values="value", index="timestamp", on="symbol")
         return self._align_to_calendar(wide, start, end)
 

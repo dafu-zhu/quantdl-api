@@ -74,7 +74,7 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
             n_valid = valid_mask.sum()
 
             if n_valid <= 1:
-                result = np.zeros_like(values)
+                result = np.zeros(len(values), dtype=np.float64)
                 result[~valid_mask] = np.nan
                 return result
 
@@ -93,7 +93,7 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
             bucket_indices = np.searchsorted(thresholds, valid_vals, side="right")
 
             # Normalize to [0, 1]
-            result = np.zeros_like(values)
+            result = np.zeros(len(values), dtype=np.float64)
             result[valid_mask] = bucket_indices / n_buckets
             result[~valid_mask] = np.nan
 
@@ -102,7 +102,7 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
         # Apply bucket ranking per date group
         ranked = long.with_columns(
             pl.col("value")
-            .map_batches(lambda s: pl.Series(bucket_rank(s.to_numpy(), rate)))
+            .map_batches(lambda s: pl.Series(bucket_rank(s.to_numpy(), rate)), return_dtype=pl.Float64)
             .over(date_col)
             .alias("value")
         )
@@ -301,7 +301,7 @@ def quantile(
         n_valid = valid_mask.sum()
 
         if n_valid <= 1:
-            result = np.zeros_like(values)
+            result = np.zeros(len(values), dtype=np.float64)
             result[~valid_mask] = np.nan
             return result
 
@@ -324,7 +324,7 @@ def quantile(
         else:
             raise ValueError(f"Unknown driver: {driver}")
 
-        result = np.zeros_like(values)
+        result = np.zeros(len(values), dtype=np.float64)
         result[valid_mask] = transformed
         result[~valid_mask] = np.nan
 
@@ -333,7 +333,7 @@ def quantile(
     # Apply transform per date group
     transformed = long.with_columns(
         pl.col("value")
-        .map_batches(lambda s: pl.Series(quantile_transform(s.to_numpy())))
+        .map_batches(lambda s: pl.Series(quantile_transform(s.to_numpy())), return_dtype=pl.Float64)
         .over(date_col)
         .alias("value")
     )

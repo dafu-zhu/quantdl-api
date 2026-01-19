@@ -194,7 +194,7 @@ class DiskCache:
             )
             self._save_metadata()
 
-    def invalidate(self, s3_path: str) -> bool:
+    def invalidate(self, s3_path: str) -> bool: # new
         """Remove specific entry from cache.
 
         Returns:

@@ -33,7 +33,9 @@ class CalendarMaster:
             cached = self._cache.get(self.CALENDAR_MASTER_PATH)
             if cached is not None:
                 self._df = cached
-                self._trading_days = set(self._df["date"].to_list())
+                # Handle both "date" and "timestamp" column names
+                date_col = "date" if "date" in self._df.columns else "timestamp"
+                self._trading_days = set(self._df[date_col].to_list())
                 return self._df
 
         # Fetch from S3
@@ -43,8 +45,9 @@ class CalendarMaster:
         if self._cache:
             self._cache.put(self.CALENDAR_MASTER_PATH, self._df)
 
-        # Build set for O(1) lookup
-        self._trading_days = set(self._df["date"].to_list())
+        # Build set for O(1) lookup - handle both column names
+        date_col = "date" if "date" in self._df.columns else "timestamp"
+        self._trading_days = set(self._df[date_col].to_list())
         return self._df
 
     def is_trading_day(self, dt: date) -> bool:
@@ -70,5 +73,6 @@ class CalendarMaster:
             Sorted list of trading days
         """
         df = self._load()
-        filtered = df.filter((pl.col("date") >= start) & (pl.col("date") <= end))
-        return sorted(filtered["date"].to_list())
+        date_col = "date" if "date" in df.columns else "timestamp"
+        filtered = df.filter((pl.col(date_col) >= start) & (pl.col(date_col) <= end))
+        return sorted(filtered[date_col].to_list())

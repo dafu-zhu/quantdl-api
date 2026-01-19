@@ -12,10 +12,11 @@ Example output:
     Days since signal bucket changed
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import rank, bucket, days_from_last_change
+from quantdl.operators import bucket, days_from_last_change, rank
 
 # Initialize client
 client = QuantDLClient()

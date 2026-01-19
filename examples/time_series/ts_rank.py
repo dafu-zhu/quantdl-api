@@ -13,6 +13,7 @@ Example output:
     Percentile rank in 20-day window
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

@@ -14,6 +14,7 @@ Example output:
     3rd element in 5-day lookback window
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

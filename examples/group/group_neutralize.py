@@ -13,11 +13,13 @@ Example output:
     Sector-neutral momentum
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, group_neutralize
+from quantdl.operators import group_neutralize, ts_delta
 
 # Initialize client
 client = QuantDLClient()

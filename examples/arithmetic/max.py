@@ -12,11 +12,12 @@ Example output:
     Upper envelope (max of 5d and 20d moving average)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_mean
 from quantdl.operators import max as ops_max
+from quantdl.operators import ts_mean
 
 # Initialize client
 client = QuantDLClient()

@@ -13,6 +13,7 @@ Example output:
     Gaussian quantile transform of prices
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

@@ -12,6 +12,7 @@ Example output:
     Inverse of prices (1/price)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

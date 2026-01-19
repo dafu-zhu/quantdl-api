@@ -13,11 +13,13 @@ Example output:
     Signed sqrt of returns (preserves direction)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, log, signed_power
+from quantdl.operators import log, signed_power, ts_delta
 
 # Initialize client
 client = QuantDLClient()

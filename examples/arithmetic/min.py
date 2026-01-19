@@ -12,11 +12,12 @@ Example output:
     Lower envelope (min of 5d and 20d moving average)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_mean
 from quantdl.operators import min as ops_min
+from quantdl.operators import ts_mean
 
 # Initialize client
 client = QuantDLClient()

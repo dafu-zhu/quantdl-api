@@ -13,6 +13,7 @@ Example output:
     10-day linear decay weighted average
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

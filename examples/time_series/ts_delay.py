@@ -13,6 +13,7 @@ Example output:
     Prices from 5 days ago
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

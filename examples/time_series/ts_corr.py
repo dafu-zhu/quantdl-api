@@ -14,6 +14,7 @@ Example output:
     20-day rolling price-volume correlation
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

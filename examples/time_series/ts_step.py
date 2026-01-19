@@ -12,6 +12,7 @@ Example output:
     Row counter 0, 1, 2, ...
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

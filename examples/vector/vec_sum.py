@@ -12,10 +12,13 @@ Example output:
     Sum of analyst price targets
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
-import polars as pl
 from datetime import date
+
+import polars as pl
+
 from quantdl.operators import vec_sum
 
 # Create sample data with list-type columns

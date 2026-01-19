@@ -15,6 +15,7 @@ Example output:
     Rolling regression of prices on volume
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

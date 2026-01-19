@@ -16,10 +16,11 @@ Example output:
     Z-score discretized into buckets
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_delay, divide, zscore, bucket
+from quantdl.operators import bucket, divide, ts_delay, ts_delta, zscore
 
 # Initialize client
 client = QuantDLClient()

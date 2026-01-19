@@ -13,10 +13,11 @@ Example output:
     Last different value in discretized signal
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import rank, bucket, last_diff_value
+from quantdl.operators import bucket, last_diff_value, rank
 
 # Initialize client
 client = QuantDLClient()

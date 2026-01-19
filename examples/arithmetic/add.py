@@ -12,10 +12,11 @@ Example output:
     Combined signal from multiple indicators
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_zscore, add
+from quantdl.operators import add, ts_zscore
 
 # Initialize client
 client = QuantDLClient()

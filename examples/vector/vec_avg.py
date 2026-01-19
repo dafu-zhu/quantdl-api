@@ -12,10 +12,13 @@ Example output:
     Average of analyst price targets
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
-import polars as pl
 from datetime import date
+
+import polars as pl
+
 from quantdl.operators import vec_avg
 
 # Create sample data with list-type columns

@@ -13,10 +13,11 @@ Example output:
     Boolean mask where price >= moving average
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_mean, ge
+from quantdl.operators import ge, ts_mean
 
 # Initialize client
 client = QuantDLClient()

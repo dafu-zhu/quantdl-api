@@ -13,6 +13,7 @@ Example output:
     Days since 20-day low
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

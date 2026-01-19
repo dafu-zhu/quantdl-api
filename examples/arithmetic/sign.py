@@ -12,10 +12,11 @@ Example output:
     Sign of daily price changes
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, sign
+from quantdl.operators import sign, ts_delta
 
 # Initialize client
 client = QuantDLClient()

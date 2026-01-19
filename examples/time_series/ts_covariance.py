@@ -14,6 +14,7 @@ Example output:
     20-day rolling price-volume covariance
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

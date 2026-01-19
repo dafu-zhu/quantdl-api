@@ -13,10 +13,11 @@ Example output:
     Smoothed z-score with limited step changes
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_zscore, hump
+from quantdl.operators import hump, ts_zscore
 
 # Initialize client
 client = QuantDLClient()

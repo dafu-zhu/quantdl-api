@@ -14,11 +14,13 @@ Example output:
     Market-cap weighted sector average momentum
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, multiply, group_mean
+from quantdl.operators import group_mean, multiply, ts_delta
 
 # Initialize client
 client = QuantDLClient()

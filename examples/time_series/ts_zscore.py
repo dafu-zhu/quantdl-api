@@ -13,6 +13,7 @@ Example output:
     20-day rolling z-score of prices
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

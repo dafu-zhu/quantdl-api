@@ -12,10 +12,11 @@ Example output:
     Volume-weighted price change
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, multiply
+from quantdl.operators import multiply, ts_delta
 
 # Initialize client
 client = QuantDLClient()

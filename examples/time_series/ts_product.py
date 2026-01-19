@@ -13,11 +13,13 @@ Example output:
     5-day cumulative return factor
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_delay, divide, add, ts_product
+from quantdl.operators import add, divide, ts_delay, ts_delta, ts_product
 
 # Initialize client
 client = QuantDLClient()

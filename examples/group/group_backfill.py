@@ -15,11 +15,13 @@ Example output:
     Momentum with NaN filled using sector mean
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, group_backfill
+from quantdl.operators import ts_delta
 
 # Initialize client
 client = QuantDLClient()

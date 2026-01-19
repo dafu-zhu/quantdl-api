@@ -15,11 +15,13 @@ Example output:
     Portfolio weights with |sum| = 1
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, normalize, scale
+from quantdl.operators import normalize, scale, ts_delta
 
 # Initialize client
 client = QuantDLClient()

@@ -13,6 +13,7 @@ Example output:
     Log of prices (for log-returns calculation)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

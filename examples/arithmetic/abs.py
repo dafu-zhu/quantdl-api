@@ -12,11 +12,12 @@ Example output:
     Absolute value of daily price changes
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta
 from quantdl.operators import abs as ops_abs
+from quantdl.operators import ts_delta
 
 # Initialize client
 client = QuantDLClient()

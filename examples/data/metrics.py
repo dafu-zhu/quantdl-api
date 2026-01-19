@@ -22,6 +22,7 @@ Note:
     for all symbols or time periods.
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

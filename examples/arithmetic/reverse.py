@@ -12,10 +12,11 @@ Example output:
     Negative momentum (for mean reversion)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, reverse
+from quantdl.operators import reverse, ts_delta
 
 # Initialize client
 client = QuantDLClient()

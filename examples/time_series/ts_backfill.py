@@ -13,10 +13,11 @@ Example output:
     Forward-filled data
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_backfill
+from quantdl.operators import ts_backfill, ts_delta
 
 # Initialize client
 client = QuantDLClient()

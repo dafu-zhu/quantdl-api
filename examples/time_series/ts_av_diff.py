@@ -13,6 +13,7 @@ Example output:
     Deviation from 20-day mean
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

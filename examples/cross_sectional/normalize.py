@@ -12,11 +12,13 @@ Example output:
     Demeaned momentum (row sums ~ 0)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, normalize
+from quantdl.operators import normalize, ts_delta
 
 # Initialize client
 client = QuantDLClient()

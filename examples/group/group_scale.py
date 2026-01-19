@@ -13,11 +13,13 @@ Example output:
     Momentum scaled within sector
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, group_scale
+from quantdl.operators import group_scale, ts_delta
 
 # Initialize client
 client = QuantDLClient()

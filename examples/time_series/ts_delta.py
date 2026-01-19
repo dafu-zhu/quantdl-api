@@ -13,6 +13,7 @@ Example output:
     20-day price change (momentum)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

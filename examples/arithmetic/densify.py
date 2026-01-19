@@ -12,10 +12,11 @@ Example output:
     Densified bucket indices (consecutive 0, 1, 2, ...)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import rank, bucket, densify
+from quantdl.operators import bucket, densify, rank
 
 # Initialize client
 client = QuantDLClient()

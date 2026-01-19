@@ -12,6 +12,7 @@ Example output:
     Cross-sectional z-score of momentum
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

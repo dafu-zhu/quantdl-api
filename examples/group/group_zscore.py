@@ -13,11 +13,13 @@ Example output:
     Momentum z-score within sector
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, group_zscore
+from quantdl.operators import group_zscore, ts_delta
 
 # Initialize client
 client = QuantDLClient()

@@ -13,10 +13,11 @@ Example output:
     Daily returns calculated as (P_t - P_{t-1}) / P_{t-1}
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_delay, divide
+from quantdl.operators import divide, ts_delay, ts_delta
 
 # Initialize client
 client = QuantDLClient()

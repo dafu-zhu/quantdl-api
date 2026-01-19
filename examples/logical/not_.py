@@ -12,10 +12,11 @@ Example output:
     Not volatile (calm days)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_delay, divide, gt, lt, or_, not_
+from quantdl.operators import divide, gt, lt, not_, or_, ts_delay, ts_delta
 
 # Initialize client
 client = QuantDLClient()

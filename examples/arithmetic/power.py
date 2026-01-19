@@ -13,9 +13,11 @@ Example output:
     Prices squared
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
 from quantdl.operators import power
 

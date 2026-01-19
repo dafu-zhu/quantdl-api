@@ -13,6 +13,7 @@ Example output:
     Winsorized momentum (clipped to +/-2 std)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

@@ -13,10 +13,11 @@ Example output:
     Count of NaN values in 10-day window
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_count_nans
+from quantdl.operators import ts_count_nans, ts_delta
 
 # Initialize client
 client = QuantDLClient()

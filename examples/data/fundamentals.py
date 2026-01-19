@@ -23,6 +23,7 @@ Example output:
     Quarterly revenue data with as_of_date as rows, symbols as columns
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

@@ -14,10 +14,11 @@ Example output:
     Trading signal (NaN when not in position)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import zscore, gt, lt, if_else, trade_when
+from quantdl.operators import gt, if_else, lt, trade_when, zscore
 
 # Initialize client
 client = QuantDLClient()

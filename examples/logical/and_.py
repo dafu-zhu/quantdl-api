@@ -13,10 +13,11 @@ Example output:
     Buy signal: price above MA AND positive momentum
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_mean, ts_delta, gt, and_
+from quantdl.operators import and_, gt, ts_delta, ts_mean
 
 # Initialize client
 client = QuantDLClient()

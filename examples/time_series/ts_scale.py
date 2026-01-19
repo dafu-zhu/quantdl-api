@@ -13,6 +13,7 @@ Example output:
     20-day scaled price (0 = at low, 1 = at high)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient

@@ -13,11 +13,13 @@ Example output:
     Momentum rank within sector
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import polars as pl
+
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, group_rank
+from quantdl.operators import group_rank, ts_delta
 
 # Initialize client
 client = QuantDLClient()

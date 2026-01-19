@@ -13,10 +13,11 @@ Example output:
     Gaussian quantile transform of momentum
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, quantile
+from quantdl.operators import quantile, ts_delta
 
 # Initialize client
 client = QuantDLClient()

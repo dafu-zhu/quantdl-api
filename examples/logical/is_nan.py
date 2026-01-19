@@ -12,10 +12,11 @@ Example output:
     Boolean mask showing where data is missing
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, is_nan
+from quantdl.operators import is_nan, ts_delta
 
 # Initialize client
 client = QuantDLClient()

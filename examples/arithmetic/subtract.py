@@ -13,10 +13,11 @@ Example output:
     Difference between short and long momentum
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, subtract
+from quantdl.operators import subtract, ts_delta
 
 # Initialize client
 client = QuantDLClient()

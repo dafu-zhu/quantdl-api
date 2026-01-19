@@ -14,10 +14,11 @@ Example output:
     Capped returns (+/- 5%) and adaptive alpha
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, ts_delay, ts_mean, divide, rank, reverse, gt, lt, if_else
+from quantdl.operators import divide, gt, if_else, lt, rank, reverse, ts_delay, ts_delta, ts_mean
 
 # Initialize client
 client = QuantDLClient()

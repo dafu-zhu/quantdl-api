@@ -13,10 +13,11 @@ Example output:
     Boolean mask where sign of daily change is not zero (non-flat day)
 """
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from quantdl import QuantDLClient
-from quantdl.operators import ts_delta, sign, ne
+from quantdl.operators import ne, sign, ts_delta
 
 # Initialize client
 client = QuantDLClient()

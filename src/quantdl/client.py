@@ -19,6 +19,27 @@ from quantdl.types import SecurityInfo
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+# Duration concepts: income statement and cash flow items measured over time
+# These default to TTM (trailing twelve months) instead of quarterly raw values
+DURATION_CONCEPTS = {
+    "rev",
+    "cor",
+    "op_inc",
+    "net_inc",
+    "ibt",
+    "inc_tax_exp",
+    "int_exp",
+    "rnd",
+    "sga",
+    "dna",
+    "cfo",
+    "cfi",
+    "cff",
+    "capex",
+    "div",
+    "sto_isu",
+}
+
 
 class QuantDLClient:
     """Client for fetching financial data from S3 with local caching.
@@ -257,12 +278,23 @@ class QuantDLClient:
         # Align to trading calendar
         return self._align_to_calendar(wide, start, end)
 
-    def _fetch_fundamentals_single(self, cik: str, end: date) -> pl.DataFrame | None:
+    def _fetch_fundamentals_single(
+        self, cik: str, end: date, source: str = "raw"
+    ) -> pl.DataFrame | None:
         """Fetch fundamentals for single security by CIK.
 
         Fetches all data up to end date (no start filter) to allow forward-fill.
+
+        Args:
+            cik: Company CIK identifier
+            end: End date filter
+            source: "raw" for quarterly filings, "ttm" for trailing twelve months
         """
-        path = f"data/raw/fundamental/{cik}/fundamental.parquet"
+        if source == "ttm":
+            path = f"data/derived/features/fundamental/{cik}/ttm.parquet"
+        else:
+            path = f"data/raw/fundamental/{cik}/fundamental.parquet"
+
         date_filter = pl.col("as_of_date") <= end
 
         cached = self._cache.get(path)
@@ -282,6 +314,7 @@ class QuantDLClient:
         self,
         securities: list[tuple[str, SecurityInfo]],
         end: date,
+        source: str = "raw",
     ) -> list[tuple[str, pl.DataFrame]]:
         """Fetch fundamentals for multiple securities concurrently."""
         loop = asyncio.get_event_loop()
@@ -291,7 +324,7 @@ class QuantDLClient:
             if info.cik is None:
                 continue
             future = loop.run_in_executor(
-                self._executor, self._fetch_fundamentals_single, info.cik, end
+                self._executor, self._fetch_fundamentals_single, info.cik, end, source
             )
             futures.append((symbol, future))
 
@@ -328,14 +361,18 @@ class QuantDLClient:
         concept: str,
         start: date | str | None = None,
         end: date | str | None = None,
+        source: str | None = None,
     ) -> pl.DataFrame:
         """Get fundamental data as wide table.
 
         Args:
             symbols: Symbol(s) to fetch
-            concept: Fundamental concept (e.g., "Revenue", "NetIncome")
+            concept: Fundamental concept (e.g., "rev", "net_inc", "ta")
             start: Start date
             end: End date
+            source: Data source - "raw" for quarterly filings, "ttm" for trailing
+                    twelve months. Defaults to "ttm" for duration concepts (income
+                    statement/cash flow items) and "raw" for balance sheet items.
 
         Returns:
             Wide DataFrame with as_of_date as first column, symbols as other columns
@@ -351,11 +388,15 @@ class QuantDLClient:
         start = start or date(2000, 1, 1)
         end = end or date.today() - timedelta(days=1)
 
+        # Default to TTM for duration concepts, raw for balance sheet items
+        if source is None:
+            source = "ttm" if concept in DURATION_CONCEPTS else "raw"
+
         resolved = self._resolve_securities(symbols, as_of=start)
         if not resolved:
             raise DataNotFoundError("fundamentals", ", ".join(symbols))
 
-        results = asyncio.run(self._fetch_fundamentals_async(resolved, end))
+        results = asyncio.run(self._fetch_fundamentals_async(resolved, end, source))
         if not results:
             raise DataNotFoundError("fundamentals", ", ".join(symbols))
 
@@ -540,6 +581,28 @@ class QuantDLClient:
     def cache_stats(self) -> dict[str, object]:
         """Get cache statistics."""
         return self._cache.stats()
+
+    def request_count(self, period: str = "session") -> int:
+        """Get S3 request count.
+
+        Args:
+            period: "session" for session count, "today" for today's count
+
+        Returns:
+            Number of S3 requests made
+        """
+        counter = self._storage.request_counter
+        if period == "today":
+            return counter.today_count
+        return counter.session_count
+
+    def request_stats(self) -> dict[str, object]:
+        """Get detailed S3 request statistics.
+
+        Returns:
+            Dictionary with session_count, today_count, and daily_counts
+        """
+        return self._storage.request_counter.stats()
 
     def close(self) -> None:
         """Clean up resources."""

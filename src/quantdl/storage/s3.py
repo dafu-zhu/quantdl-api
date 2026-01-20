@@ -1,12 +1,95 @@
 """S3 storage backend using Polars native scan_parquet."""
 
+import json
 import os
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 
 from quantdl.exceptions import S3Error
+
+# Default path for persisting request counts
+_DEFAULT_COUNTS_PATH = Path.home() / ".quantdl" / "request_counts.json"
+
+
+class S3RequestCounter:
+    """Tracks S3 API request counts per session and per day.
+
+    Daily counts persist across sessions via JSON file.
+    Session counts reset on each new client instance.
+    """
+
+    def __init__(self, persist_path: Path | None = None) -> None:
+        """Initialize counter, loading persisted daily counts.
+
+        Args:
+            persist_path: Path to persist daily counts (default: ~/.quantdl/request_counts.json)
+        """
+        self._session_count = 0
+        self._persist_path = persist_path or _DEFAULT_COUNTS_PATH
+        self._daily_counts: dict[date, int] = self._load()
+
+    def _load(self) -> dict[date, int]:
+        """Load daily counts from disk."""
+        if not self._persist_path.exists():
+            return {}
+        try:
+            with open(self._persist_path) as f:
+                data = json.load(f)
+            return {date.fromisoformat(k): v for k, v in data.items()}
+        except (json.JSONDecodeError, ValueError, OSError):
+            return {}
+
+    def _save(self) -> None:
+        """Save daily counts to disk."""
+        self._persist_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            data = {k.isoformat(): v for k, v in self._daily_counts.items()}
+            with open(self._persist_path, "w") as f:
+                json.dump(data, f)
+        except OSError:
+            pass  # Silently fail if unable to persist
+
+    def increment(self) -> None:
+        """Increment request count for session and current day."""
+        self._session_count += 1
+        today = date.today()
+        self._daily_counts[today] = self._daily_counts.get(today, 0) + 1
+        self._save()
+
+    @property
+    def session_count(self) -> int:
+        """Total requests in this session."""
+        return self._session_count
+
+    @property
+    def today_count(self) -> int:
+        """Requests made today."""
+        return self._daily_counts.get(date.today(), 0)
+
+    def daily_count(self, day: date) -> int:
+        """Requests made on a specific day."""
+        return self._daily_counts.get(day, 0)
+
+    def reset_session(self) -> None:
+        """Reset session counter."""
+        self._session_count = 0
+
+    def reset_daily(self) -> None:
+        """Reset all daily counts and remove persisted file."""
+        self._daily_counts = {}
+        if self._persist_path.exists():
+            self._persist_path.unlink()
+
+    def stats(self) -> dict[str, Any]:
+        """Get all stats as dictionary."""
+        return {
+            "session_count": self._session_count,
+            "today_count": self.today_count,
+            "daily_counts": {k.isoformat(): v for k, v in self._daily_counts.items()},
+        }
 
 
 class S3StorageBackend:
@@ -37,6 +120,7 @@ class S3StorageBackend:
         self.bucket = bucket
         self._local_path = Path(local_path) if local_path else None
         self._storage_options: dict[str, str] = {}
+        self._request_counter = S3RequestCounter()
 
         if not self._local_path:
             # Use provided credentials or fall back to environment
@@ -76,6 +160,7 @@ class S3StorageBackend:
             if self._local_path:
                 lf = pl.scan_parquet(resolved)
             else:
+                self._request_counter.increment()
                 lf = pl.scan_parquet(resolved, storage_options=self._storage_options)
             if columns:
                 lf = lf.select(columns)
@@ -121,3 +206,8 @@ class S3StorageBackend:
             return True
         except S3Error:
             return False
+
+    @property
+    def request_counter(self) -> S3RequestCounter:
+        """Access the request counter."""
+        return self._request_counter

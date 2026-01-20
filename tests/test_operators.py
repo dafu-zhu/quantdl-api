@@ -6,14 +6,12 @@ from datetime import date
 import polars as pl
 import pytest
 
-from quantdl.exceptions import InvalidBucketSpecError
 from quantdl.operators import (
     abs as op_abs,
 )
 from quantdl.operators import (
     add,
     and_,
-    bucket,
     days_from_last_change,
     densify,
     divide,
@@ -49,7 +47,6 @@ from quantdl.operators import (
     signed_power,
     sqrt,
     subtract,
-    trade_when,
     ts_arg_max,
     ts_arg_min,
     ts_av_diff,
@@ -105,15 +102,15 @@ class TestTimeSeriesOperators:
     """Time-series operator tests."""
 
     def test_ts_mean(self, wide_df: pl.DataFrame) -> None:
-        """Test rolling mean."""
+        """Test rolling mean with partial windows."""
         result = ts_mean(wide_df, 3)
 
         assert result.columns == wide_df.columns
         assert len(result) == len(wide_df)
 
-        # First 2 values should be null
-        assert result["AAPL"][0] is None
-        assert result["AAPL"][1] is None
+        # Partial windows allowed: row 0 has mean of [100], row 1 has mean of [100, 102]
+        assert result["AAPL"][0] == 100.0
+        assert abs(result["AAPL"][1] - 101.0) < 0.01  # (100 + 102) / 2
 
         # Third value should be mean of first 3
         expected = (100.0 + 102.0 + 101.0) / 3
@@ -218,16 +215,18 @@ class TestTimeSeriesOperators:
         assert result["AAPL"][9] == 10
 
     def test_ts_arg_max(self, wide_df: pl.DataFrame) -> None:
-        """Test index of max in window."""
+        """Test days since max in window."""
         result = ts_arg_max(wide_df, 3)
-        # At idx 2: window [100, 102, 101], max is 102 at idx 1
+        # At idx 2: window [100, 102, 101], max is 102 at window idx 1
+        # Days since: (3-1) - 1 = 1 (max was 1 day ago)
         assert result["AAPL"][2] == 1.0
 
     def test_ts_arg_min(self, wide_df: pl.DataFrame) -> None:
-        """Test index of min in window."""
+        """Test days since min in window."""
         result = ts_arg_min(wide_df, 3)
-        # At idx 2: window [100, 102, 101], min is 100 at idx 0
-        assert result["AAPL"][2] == 0.0
+        # At idx 2: window [100, 102, 101], min is 100 at window idx 0
+        # Days since: (3-1) - 0 = 2 (min was 2 days ago)
+        assert result["AAPL"][2] == 2.0
 
     def test_ts_backfill(self) -> None:
         """Test forward fill with limit."""
@@ -1397,327 +1396,6 @@ class TestGroupOperators:
 
 
 # =============================================================================
-# TRANSFORMATIONAL OPERATORS
-# =============================================================================
-
-
-class TestBucketOperator:
-    """Tests for bucket operator."""
-
-    def test_bucket_with_range(self) -> None:
-        """Test bucket with range parameter."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [-5.0, 1.0, 5.0, 7.0, 15.0],
-        })
-        result = bucket(df, range_spec="0,10,2")
-        # boundaries: 0, 2, 4, 6, 8, 10
-        # buckets: (-inf,0]=0, (0,2]=1, (2,4]=2, (4,6]=3, (6,8]=4, (8,10]=5, (10,inf)=6
-        # -5 -> 0 (hidden begin), 1 -> 1, 5 -> 3, 7 -> 4, 15 -> 6 (hidden end)
-        assert result["A"][0] == 0  # -5 in (-inf, 0]
-        assert result["A"][1] == 1  # 1 in (0, 2]
-        assert result["A"][2] == 3  # 5 in (4, 6]
-        assert result["A"][3] == 4  # 7 in (6, 8]
-        assert result["A"][4] == 6  # 15 in (10, inf)
-
-    def test_bucket_with_buckets(self) -> None:
-        """Test bucket with explicit buckets parameter."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 4), eager=True),
-            "A": [0.5, 3.0, 7.0, 25.0],
-        })
-        result = bucket(df, buckets="0,5,10,20")
-        # buckets: (-inf,0]=0, (0,5]=1, (5,10]=2, (10,20]=3, (20,inf)=4
-        assert result["A"][0] == 1  # 0.5 in (0, 5]
-        assert result["A"][1] == 1  # 3.0 in (0, 5]
-        assert result["A"][2] == 2  # 7.0 in (5, 10]
-        assert result["A"][3] == 4  # 25.0 in (20, inf)
-
-    def test_bucket_skip_begin(self) -> None:
-        """Test bucket with skipBegin=True."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [-5.0, 5.0, 15.0],
-        })
-        result = bucket(df, range_spec="0,10,5", skipBegin=True)
-        # boundaries: 0, 5, 10 (no hidden begin bucket)
-        # buckets: (0,5]=0, (5,10]=1, (10,inf)=2
-        assert result["A"][0] is None  # -5 not in any bucket
-        assert result["A"][1] == 0  # 5 in (0, 5]
-        assert result["A"][2] == 2  # 15 in (10, inf)
-
-    def test_bucket_skip_end(self) -> None:
-        """Test bucket with skipEnd=True."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [-5.0, 5.0, 15.0],
-        })
-        result = bucket(df, range_spec="0,10,5", skipEnd=True)
-        # boundaries: 0, 5, 10 (no hidden end bucket)
-        # buckets: (-inf,0]=0, (0,5]=1, (5,10]=2
-        assert result["A"][0] == 0  # -5 in (-inf, 0]
-        assert result["A"][1] == 1  # 5 in (0, 5]
-        assert result["A"][2] is None  # 15 not in any bucket
-
-    def test_bucket_skip_both(self) -> None:
-        """Test bucket with skipBoth=True."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [-5.0, 5.0, 15.0],
-        })
-        result = bucket(df, range_spec="0,10,5", skipBoth=True)
-        # boundaries: 0, 5, 10 (no hidden buckets)
-        # buckets: (0,5]=0, (5,10]=1
-        assert result["A"][0] is None  # -5 not in any bucket
-        assert result["A"][1] == 0  # 5 in (0, 5]
-        assert result["A"][2] is None  # 15 not in any bucket
-
-    def test_bucket_nan_group(self) -> None:
-        """Test bucket with NANGroup=True."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [None, 5.0, float("nan")],
-        })
-        result = bucket(df, range_spec="0,10,5", NANGroup=True)
-        # Last idx without NANGroup is 3, so NaN -> 4
-        assert result["A"][0] == 4  # None -> NaN group
-        assert result["A"][1] == 1  # 5 in (0, 5]
-        assert result["A"][2] == 4  # NaN -> NaN group
-
-    def test_bucket_nan_no_group(self) -> None:
-        """Test bucket without NANGroup (default)."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
-            "A": [None, 5.0],
-        })
-        result = bucket(df, range_spec="0,10,5")
-        assert result["A"][0] is None  # None stays None
-        assert result["A"][1] == 1  # 5 in (0, 5]
-
-    def test_bucket_boundary_value(self) -> None:
-        """Test bucket boundary inclusion (left-open, right-closed)."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [0.0, 5.0, 10.0],
-        })
-        result = bucket(df, range_spec="0,10,5")
-        # (lower, upper] inclusion
-        # 0 is boundary -> in (-inf, 0] (bucket 0)
-        # 5 is boundary -> in (0, 5] (bucket 1)
-        # 10 is boundary -> in (5, 10] (bucket 2)
-        assert result["A"][0] == 0  # 0 in (-inf, 0]
-        assert result["A"][1] == 1  # 5 in (0, 5]
-        assert result["A"][2] == 2  # 10 in (5, 10]
-
-    def test_bucket_returns_int64(self) -> None:
-        """Test bucket returns Int64 type."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
-            "A": [1.0, 5.0],
-        })
-        result = bucket(df, range_spec="0,10,5")
-        assert result["A"].dtype == pl.Int64
-
-    def test_bucket_error_no_spec(self) -> None:
-        """Test bucket raises error when no spec provided."""
-        df = pl.DataFrame({
-            "timestamp": [date(2024, 1, 1)],
-            "A": [5.0],
-        })
-        with pytest.raises(InvalidBucketSpecError):
-            bucket(df)
-
-    def test_bucket_error_both_specs(self) -> None:
-        """Test bucket raises error when both specs provided."""
-        df = pl.DataFrame({
-            "timestamp": [date(2024, 1, 1)],
-            "A": [5.0],
-        })
-        with pytest.raises(InvalidBucketSpecError):
-            bucket(df, range_spec="0,10,2", buckets="0,5,10")
-
-    def test_bucket_error_invalid_range(self) -> None:
-        """Test bucket raises error for invalid range format."""
-        df = pl.DataFrame({
-            "timestamp": [date(2024, 1, 1)],
-            "A": [5.0],
-        })
-        with pytest.raises(InvalidBucketSpecError):
-            bucket(df, range_spec="0,10")  # Missing step
-
-    def test_bucket_error_negative_step(self) -> None:
-        """Test bucket raises error for negative step."""
-        df = pl.DataFrame({
-            "timestamp": [date(2024, 1, 1)],
-            "A": [5.0],
-        })
-        with pytest.raises(InvalidBucketSpecError):
-            bucket(df, range_spec="0,10,-2")
-
-    def test_bucket_multiple_columns(self) -> None:
-        """Test bucket with multiple columns."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 2), eager=True),
-            "A": [1.0, 6.0],
-            "B": [3.0, 12.0],
-        })
-        result = bucket(df, range_spec="0,10,5")
-        assert result["A"][0] == 1  # 1 in (0, 5]
-        assert result["A"][1] == 2  # 6 in (5, 10]
-        assert result["B"][0] == 1  # 3 in (0, 5]
-        assert result["B"][1] == 3  # 12 in (10, inf)
-
-
-class TestTradeWhenOperator:
-    """Tests for trade_when operator."""
-
-    def test_trade_when_basic(self) -> None:
-        """Test basic trade_when behavior."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [1.0, 0.0, 0.0, 0.0, 0.0],  # Enter on day 1
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [10.0, 11.0, 12.0, 13.0, 14.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [0.0, 0.0, 0.0, 0.0, 0.0],  # No exit
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] == 10.0  # Enter with alpha
-        assert result["A"][1] == 10.0  # Hold
-        assert result["A"][2] == 10.0  # Hold
-        assert result["A"][3] == 10.0  # Hold
-        assert result["A"][4] == 10.0  # Hold
-
-    def test_trade_when_exit(self) -> None:
-        """Test trade_when with exit trigger."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [1.0, 0.0, 0.0, 0.0, 0.0],  # Enter on day 1
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [10.0, 11.0, 12.0, 13.0, 14.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [0.0, 0.0, 1.0, 0.0, 0.0],  # Exit on day 3
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] == 10.0  # Enter
-        assert result["A"][1] == 10.0  # Hold
-        assert result["A"][2] is None  # Exit -> NaN
-        assert result["A"][3] is None  # Stay out
-        assert result["A"][4] is None  # Stay out
-
-    def test_trade_when_reenter(self) -> None:
-        """Test trade_when re-entering after exit."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [1.0, 0.0, 0.0, 1.0, 0.0],  # Enter day 1, re-enter day 4
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [10.0, 11.0, 12.0, 13.0, 14.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
-            "A": [0.0, 0.0, 1.0, 0.0, 0.0],  # Exit day 3
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] == 10.0  # Enter
-        assert result["A"][1] == 10.0  # Hold
-        assert result["A"][2] is None  # Exit
-        assert result["A"][3] == 13.0  # Re-enter
-        assert result["A"][4] == 13.0  # Hold
-
-    def test_trade_when_exit_priority(self) -> None:
-        """Test that exit wins over trigger when both > 0."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [1.0, 1.0, 0.0],  # Trigger on days 1 and 2
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [10.0, 11.0, 12.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [0.0, 1.0, 0.0],  # Exit on day 2 (same time as trigger)
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] == 10.0  # Enter
-        assert result["A"][1] is None  # Exit wins over trigger
-        assert result["A"][2] is None  # Stay out
-
-    def test_trade_when_no_initial_trigger(self) -> None:
-        """Test trade_when when no initial trigger fires."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [0.0, 0.0, 1.0],  # No trigger until day 3
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [10.0, 11.0, 12.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [0.0, 0.0, 0.0],
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] is None  # No position
-        assert result["A"][1] is None  # No position
-        assert result["A"][2] == 12.0  # Enter
-
-    def test_trade_when_multiple_columns(self) -> None:
-        """Test trade_when with multiple columns."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [1.0, 0.0, 0.0],
-            "B": [0.0, 1.0, 0.0],
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [10.0, 11.0, 12.0],
-            "B": [20.0, 21.0, 22.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [0.0, 0.0, 0.0],
-            "B": [0.0, 0.0, 0.0],
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] == 10.0
-        assert result["A"][1] == 10.0
-        assert result["A"][2] == 10.0
-        assert result["B"][0] is None
-        assert result["B"][1] == 21.0
-        assert result["B"][2] == 21.0
-
-    def test_trade_when_with_null_trigger(self) -> None:
-        """Test trade_when with null trigger values."""
-        trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [1.0, None, 0.0],
-        })
-        alpha = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [10.0, 11.0, 12.0],
-        })
-        exit_trigger = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 3), eager=True),
-            "A": [0.0, 0.0, 0.0],
-        })
-        result = trade_when(trigger, alpha, exit_trigger)
-        assert result["A"][0] == 10.0  # Enter
-        assert result["A"][1] == 10.0  # None trigger = hold
-        assert result["A"][2] == 10.0  # Hold
-
-
-# =============================================================================
 # OPERATOR COMPOSITION
 # =============================================================================
 
@@ -1731,9 +1409,9 @@ class TestOperatorComposition:
         ranked = rank(ma)
 
         assert ranked.columns == wide_df.columns
-        # First 2 rows have nulls from rolling mean, rank returns NaN
-        assert ranked["AAPL"][0] is None or math.isnan(ranked["AAPL"][0])
-        assert ranked["AAPL"][1] is None or math.isnan(ranked["AAPL"][1])
+        # With partial windows, all rows have values and can be ranked
+        assert 0.0 <= ranked["AAPL"][0] <= 1.0
+        assert 0.0 <= ranked["AAPL"][1] <= 1.0
 
     def test_normalize_then_scale(self, wide_df: pl.DataFrame) -> None:
         """Test composing cross-sectional operators."""
@@ -1831,7 +1509,7 @@ class TestTsRegressionRetTypes:
         assert result["A"][4] is None
 
     def test_ts_regression_with_nulls(self) -> None:
-        """Test regression with null values."""
+        """Test regression filters out null pairs and computes with available data."""
         y = pl.DataFrame({
             "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 5), eager=True),
             "A": [1.0, None, 3.0, 4.0, 5.0],
@@ -1841,8 +1519,8 @@ class TestTsRegressionRetTypes:
             "A": [1.0, 2.0, 3.0, 4.0, 5.0],
         })
         result = ts_regression(y, x, 3, rettype=1)
-        # Window with null should return None
-        assert result["A"][2] is None
+        # At idx 2: pairs [(1,1), (3,3)] after filtering null, beta = 1.0
+        assert result["A"][2] == 1.0
 
     def test_ts_regression_zero_variance(self) -> None:
         """Test regression with zero variance in x (ss_xx=0)."""

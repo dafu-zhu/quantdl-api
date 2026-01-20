@@ -39,6 +39,25 @@ class TestClientBasics:
         ) as client:
             assert client is not None
 
+    def test_request_count_session(self, client: QuantDLClient) -> None:
+        """Test request_count returns session count."""
+        count = client.request_count()
+        assert isinstance(count, int)
+        assert count >= 0
+
+    def test_request_count_today(self, client: QuantDLClient) -> None:
+        """Test request_count with period='today'."""
+        count = client.request_count(period="today")
+        assert isinstance(count, int)
+        assert count >= 0
+
+    def test_request_stats(self, client: QuantDLClient) -> None:
+        """Test request_stats returns correct structure."""
+        stats = client.request_stats()
+        assert "session_count" in stats
+        assert "today_count" in stats
+        assert "daily_counts" in stats
+
 
 class TestSecurityResolution:
     """Security resolution tests."""

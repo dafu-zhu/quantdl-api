@@ -508,9 +508,9 @@ class TestCleanSyntax:
         """Test ts_mean without ops. prefix."""
         result = alpha_eval("ts_mean(close, 3)", {"close": wide_df}, ops=ops)
         assert result is not None
-        # First 2 values should be null (need 3 values for window)
-        assert result.data["AAPL"][0] is None
-        assert result.data["AAPL"][1] is None
+        # Partial windows allowed: row 0 has mean of [100], row 1 has mean of [100, 102]
+        assert result.data["AAPL"][0] == 100.0
+        assert result.data["AAPL"][1] == 101.0  # (100 + 102) / 2
         # Third value: avg(100, 102, 101) = 101
         assert result.data["AAPL"][2] == 101.0
 

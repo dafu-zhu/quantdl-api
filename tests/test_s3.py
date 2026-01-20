@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from quantdl.exceptions import S3Error
-from quantdl.storage.s3 import S3StorageBackend
+from quantdl.storage.s3 import S3RequestCounter, S3StorageBackend
 
 
 @pytest.fixture
@@ -132,3 +132,78 @@ class TestS3ColumnSelection:
         )
         assert len(df) == 1
         assert df["symbol"][0] == "AAPL"
+
+
+class TestS3RequestCounter:
+    """Tests for S3 request counter."""
+
+    def test_counter_increment(self, tmp_path: Path) -> None:
+        """Test counter increments correctly."""
+        counter = S3RequestCounter(persist_path=tmp_path / "counts.json")
+        assert counter.session_count == 0
+        counter.increment()
+        assert counter.session_count == 1
+        counter.increment()
+        assert counter.session_count == 2
+
+    def test_counter_today_count(self, tmp_path: Path) -> None:
+        """Test today's count tracks correctly."""
+        counter = S3RequestCounter(persist_path=tmp_path / "counts.json")
+        assert counter.today_count == 0
+        counter.increment()
+        assert counter.today_count == 1
+
+    def test_counter_reset_session(self, tmp_path: Path) -> None:
+        """Test session reset."""
+        counter = S3RequestCounter(persist_path=tmp_path / "counts.json")
+        counter.increment()
+        counter.increment()
+        assert counter.session_count == 2
+        counter.reset_session()
+        assert counter.session_count == 0
+
+    def test_counter_stats(self, tmp_path: Path) -> None:
+        """Test stats returns correct structure."""
+        counter = S3RequestCounter(persist_path=tmp_path / "counts.json")
+        counter.increment()
+        stats = counter.stats()
+        assert "session_count" in stats
+        assert "today_count" in stats
+        assert "daily_counts" in stats
+        assert stats["session_count"] == 1
+
+    def test_counter_persistence(self, tmp_path: Path) -> None:
+        """Test daily counts persist across instances."""
+        persist_path = tmp_path / "counts.json"
+
+        # First counter instance
+        counter1 = S3RequestCounter(persist_path=persist_path)
+        counter1.increment()
+        counter1.increment()
+        assert counter1.today_count == 2
+
+        # Second counter instance loads persisted counts
+        counter2 = S3RequestCounter(persist_path=persist_path)
+        assert counter2.session_count == 0  # Session resets
+        assert counter2.today_count == 2  # Daily persists
+
+        # Increment in new session adds to daily
+        counter2.increment()
+        assert counter2.today_count == 3
+
+    def test_counter_reset_daily(self, tmp_path: Path) -> None:
+        """Test reset_daily clears persisted counts."""
+        persist_path = tmp_path / "counts.json"
+        counter = S3RequestCounter(persist_path=persist_path)
+        counter.increment()
+        assert counter.today_count == 1
+
+        counter.reset_daily()
+        assert counter.today_count == 0
+        assert not persist_path.exists()
+
+    def test_storage_has_counter(self, local_storage: S3StorageBackend) -> None:
+        """Test S3StorageBackend has request counter."""
+        counter = local_storage.request_counter
+        assert isinstance(counter, S3RequestCounter)
+        assert counter.session_count == 0

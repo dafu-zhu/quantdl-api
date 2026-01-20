@@ -3,7 +3,13 @@
 All operators preserve the wide table structure:
 - First column (date) is unchanged
 - Operations applied element-wise to symbol columns
+
+Note: min, max, abs are designed to be drop-in replacements for Python built-ins.
+They detect input types and delegate to built-ins when appropriate.
 """
+
+import builtins
+from collections.abc import Iterable
 
 import polars as pl
 
@@ -13,23 +19,29 @@ def _get_value_cols(df: pl.DataFrame) -> list[str]:
     return df.columns[1:]
 
 
-def abs(x: pl.DataFrame | float | int) -> pl.DataFrame | float | int:
-    """Absolute value.
+def _has_dataframe(*args) -> bool:
+    """Check if any argument is a DataFrame."""
+    return any(isinstance(a, pl.DataFrame) for a in args)
+
+
+def abs(x):
+    """Absolute value - compatible with Python built-in.
 
     Args:
-        x: Scalar or Wide DataFrame with date + symbol columns
+        x: Scalar, Wide DataFrame, or any object with __abs__
 
     Returns:
-        Scalar or Wide DataFrame with absolute values
+        Absolute value (type matches input)
     """
-    if isinstance(x, (int, float)):
-        return x if x >= 0 else -x
-    date_col = x.columns[0]
-    value_cols = _get_value_cols(x)
-    return x.select(
-        pl.col(date_col),
-        *[pl.col(c).abs().alias(c) for c in value_cols],
-    )
+    if isinstance(x, pl.DataFrame):
+        date_col = x.columns[0]
+        value_cols = _get_value_cols(x)
+        return x.select(
+            pl.col(date_col),
+            *[pl.col(c).abs().alias(c) for c in value_cols],
+        )
+    # Fallback to Python built-in
+    return builtins.abs(x)
 
 
 def add(*args: pl.DataFrame, filter: bool = False) -> pl.DataFrame:
@@ -231,17 +243,32 @@ def log(x: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def max(*args: pl.DataFrame) -> pl.DataFrame:
-    """Element-wise maximum of two or more DataFrames.
+def max(*args, **kwargs):
+    """Element-wise maximum - compatible with Python built-in.
+
+    When called with DataFrames: element-wise max across inputs.
+    Otherwise: delegates to Python's built-in max().
 
     Args:
-        *args: Two or more wide DataFrames with matching structure
+        *args: DataFrames for element-wise max, or any args for built-in max
+        **kwargs: Passed to built-in max (e.g., key=, default=)
 
     Returns:
-        Wide DataFrame with max values across inputs
+        Wide DataFrame with max values, or result of built-in max
+
+    Examples:
+        >>> max(df1, df2)           # Element-wise max of DataFrames
+        >>> max([1, 2, 3])          # Python built-in: 3
+        >>> max(1, 2, 3)            # Python built-in: 3
+        >>> max(items, key=len)     # Python built-in with key
     """
+    # If kwargs provided or no DataFrames, use built-in
+    if kwargs or not _has_dataframe(*args):
+        return builtins.max(*args, **kwargs)
+
+    # Element-wise max for DataFrames
     if len(args) < 2:
-        raise ValueError("max requires at least 2 inputs")
+        raise ValueError("max requires at least 2 DataFrames for element-wise operation")
 
     date_col = args[0].columns[0]
     value_cols = _get_value_cols(args[0])
@@ -255,17 +282,32 @@ def max(*args: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def min(*args: pl.DataFrame) -> pl.DataFrame:
-    """Element-wise minimum of two or more DataFrames.
+def min(*args, **kwargs):
+    """Element-wise minimum - compatible with Python built-in.
+
+    When called with DataFrames: element-wise min across inputs.
+    Otherwise: delegates to Python's built-in min().
 
     Args:
-        *args: Two or more wide DataFrames with matching structure
+        *args: DataFrames for element-wise min, or any args for built-in min
+        **kwargs: Passed to built-in min (e.g., key=, default=)
 
     Returns:
-        Wide DataFrame with min values across inputs
+        Wide DataFrame with min values, or result of built-in min
+
+    Examples:
+        >>> min(df1, df2)           # Element-wise min of DataFrames
+        >>> min([1, 2, 3])          # Python built-in: 1
+        >>> min(1, 2, 3)            # Python built-in: 1
+        >>> min(items, key=len)     # Python built-in with key
     """
+    # If kwargs provided or no DataFrames, use built-in
+    if kwargs or not _has_dataframe(*args):
+        return builtins.min(*args, **kwargs)
+
+    # Element-wise min for DataFrames
     if len(args) < 2:
-        raise ValueError("min requires at least 2 inputs")
+        raise ValueError("min requires at least 2 DataFrames for element-wise operation")
 
     date_col = args[0].columns[0]
     value_cols = _get_value_cols(args[0])

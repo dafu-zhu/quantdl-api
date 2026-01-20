@@ -211,4 +211,6 @@ __marimo__/
 
 # Documents
 ruff.md
-task.md
+task.md 
+
+uv.lock

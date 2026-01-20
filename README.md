@@ -9,22 +9,11 @@
 [![Polars](https://img.shields.io/badge/dataframe-Polars-CD792C.svg)](https://pola.rs/)
 [![Hatch](https://img.shields.io/badge/build-Hatch-4051b5.svg)](https://hatch.pypa.io/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-
-[![GitHub stars](https://img.shields.io/github/stars/dafu-zhu/quantdl-api?style=social)](https://github.com/dafu-zhu/quantdl-api/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/dafu-zhu/quantdl-api?style=social)](https://github.com/dafu-zhu/quantdl-api/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/dafu-zhu/quantdl-api)](https://github.com/dafu-zhu/quantdl-api/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/dafu-zhu/quantdl-api)](https://github.com/dafu-zhu/quantdl-api/commits/main)
-[![GitHub repo size](https://img.shields.io/github/repo-size/dafu-zhu/quantdl-api)](https://github.com/dafu-zhu/quantdl-api)
-
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Imports: isort](https://img.shields.io/badge/imports-isort-1674b1.svg)](https://pycqa.github.io/isort/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com/)
-[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
-[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
-
 [![AWS S3](https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
 [![Typed](https://img.shields.io/badge/typed-strict-blue.svg)](https://peps.python.org/pep-0484/)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/dafu-zhu/quantdl-api)
 
 Financial data library for alpha research. Fetches data from S3, returns wide tables, includes local caching and composable operators.
 

@@ -27,22 +27,22 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Gaussian quantile transform
 gaussian_quantile = quantile(momentum, driver="gaussian")
 
 print("quantile() - Cross-sectional quantile transform")
 print("=" * 50)
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nGaussian quantile transform:")
-print(gaussian_quantile.tail(3))
+print(gaussian_quantile.head(7))
 
 # Uniform quantile transform
 uniform_quantile = quantile(momentum, driver="uniform")
 print("\nUniform quantile transform:")
-print(uniform_quantile.tail(3))
+print(uniform_quantile.head(7))
 
 # Cleanup
 client.close()

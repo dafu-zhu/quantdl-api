@@ -34,9 +34,9 @@ days_unchanged = days_from_last_change(discrete_signal)
 print("days_from_last_change() - Days since value changed")
 print("=" * 50)
 print("\nDiscrete signal:")
-print(discrete_signal.head(10))
+print(discrete_signal.head(7))
 print("\nDays since signal changed:")
-print(days_unchanged.head(10))
+print(days_unchanged.head(7))
 
 # Cleanup
 client.close()

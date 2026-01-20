@@ -45,17 +45,17 @@ groups = prices.select(
 )
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Sector-neutralize
 sector_neutral = group_neutralize(momentum, groups)
 
 print("group_neutralize() - Sector-neutral signal")
 print("=" * 50)
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nSector-neutral momentum (subtract sector mean):")
-print(sector_neutral.tail(3))
+print(sector_neutral.head(7))
 
 # Cleanup
 client.close()

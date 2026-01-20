@@ -45,17 +45,17 @@ groups = prices.select(
 )
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Z-score within sector
 sector_zscore = group_zscore(momentum, groups)
 
 print("group_zscore() - Z-score within groups")
 print("=" * 50)
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nMomentum z-score within sector:")
-print(sector_zscore.tail(3))
+print(sector_zscore.head(7))
 
 # Cleanup
 client.close()

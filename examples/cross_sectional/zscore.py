@@ -26,17 +26,17 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Cross-sectional z-score
 cs_zscore = zscore(momentum)
 
 print("zscore() - Cross-sectional standardization")
 print("=" * 50)
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nCross-sectional z-score:")
-print(cs_zscore.tail(3))
+print(cs_zscore.head(7))
 
 # Cleanup
 client.close()

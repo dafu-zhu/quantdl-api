@@ -27,20 +27,20 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate moving averages
+ma_3 = ts_mean(prices, 3)
 ma_5 = ts_mean(prices, 5)
-ma_20 = ts_mean(prices, 20)
 
 # Compute upper envelope
-ma_upper = ops_max(ma_5, ma_20)
+ma_upper = ops_max(ma_3, ma_5)
 
 print("max() - Element-wise maximum across DataFrames")
 print("=" * 50)
+print("\n3-day moving average:")
+print(ma_3.head(7))
 print("\n5-day moving average:")
-print(ma_5.tail(3))
-print("\n20-day moving average:")
-print(ma_20.tail(3))
-print("\nUpper envelope (max of MA5, MA20):")
-print(ma_upper.tail(3))
+print(ma_5.head(7))
+print("\nUpper envelope (max of MA3, MA5):")
+print(ma_upper.head(7))
 
 # Cleanup
 client.close()

@@ -27,8 +27,8 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 volume = client.ticks(symbols, field="volume", start="2024-01-01", end="2024-06-30")
 
 # Create two signals
-price_signal = ts_zscore(prices, 20)
-vol_signal = ts_zscore(volume, 20)
+price_signal = ts_zscore(prices, 5)
+vol_signal = ts_zscore(volume, 5)
 
 # Combine signals with add (variadic - can add more DataFrames)
 combined = add(price_signal, vol_signal)
@@ -36,16 +36,16 @@ combined = add(price_signal, vol_signal)
 print("add() - Element-wise addition (variadic)")
 print("=" * 50)
 print("\nPrice z-score signal:")
-print(price_signal.tail(3))
+print(price_signal.head(7))
 print("\nVolume z-score signal:")
-print(vol_signal.tail(3))
+print(vol_signal.head(7))
 print("\nCombined signal (price + volume z-scores):")
-print(combined.tail(3))
+print(combined.head(7))
 
 # Example with 3 inputs (variadic)
 triple_combined = add(price_signal, vol_signal, price_signal)
 print("\nTriple combined (price + vol + price):")
-print(triple_combined.tail(3))
+print(triple_combined.head(7))
 
 # Cleanup
 client.close()

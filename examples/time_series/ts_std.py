@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day rolling volatility of returns
+    5-day rolling volatility of returns
 """
 from dotenv import load_dotenv
 

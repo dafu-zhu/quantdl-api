@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    Days since 20-day low
+    Days since 4-day low
 """
 from dotenv import load_dotenv
 
@@ -33,7 +33,7 @@ print("ts_arg_min() - Days since window minimum")
 print("=" * 50)
 print("\nPrices:")
 print(prices.head(7))
-print("\nDays since 20-day low (0 = today is low):")
+print("\nDays since 4-day low (0 = today is low):")
 print(days_since_low.head(7))
 
 # Cleanup

@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day rolling z-score of prices
+    5-day rolling z-score of prices
 """
 from dotenv import load_dotenv
 

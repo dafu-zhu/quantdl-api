@@ -11,7 +11,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day rolling price-volume covariance
+    5-day rolling price-volume covariance
 """
 from dotenv import load_dotenv
 
@@ -33,8 +33,8 @@ price_vol_cov = ts_covariance(prices, volume, 5)
 
 print("ts_covariance() - Rolling covariance")
 print("=" * 50)
-print("\n20-day rolling price-volume covariance:")
-print(price_vol_cov.head(10))
+print("\n5-day rolling price-volume covariance:")
+print(price_vol_cov.head(7))
 
 # Cleanup
 client.close()

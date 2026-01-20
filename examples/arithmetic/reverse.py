@@ -34,9 +34,9 @@ neg_momentum = reverse(momentum)
 print("reverse() - Negation (-x)")
 print("=" * 50)
 print("\nOriginal momentum:")
-print(momentum.tail(3))
+print(momentum.head(3))
 print("\nReversed momentum (for mean reversion):")
-print(neg_momentum.tail(3))
+print(neg_momentum.head(3))
 
 # Cleanup
 client.close()

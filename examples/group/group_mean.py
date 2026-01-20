@@ -47,7 +47,7 @@ groups = prices.select(
 )
 
 # Calculate momentum and market cap proxy (price * volume)
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 market_cap_proxy = multiply(prices, volume)
 
 # Weighted sector mean
@@ -55,10 +55,10 @@ sector_avg = group_mean(momentum, market_cap_proxy, groups)
 
 print("group_mean() - Weighted mean within groups")
 print("=" * 50)
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nMarket-cap weighted sector average momentum:")
-print(sector_avg.tail(3))
+print(sector_avg.head(7))
 
 # Cleanup
 client.close()

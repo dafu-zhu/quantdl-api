@@ -47,7 +47,7 @@ groups = prices.select(
 )
 
 # Calculate momentum (will have NaN in early rows)
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 print("group_backfill() - Fill NaN with group mean")
 print("=" * 50)

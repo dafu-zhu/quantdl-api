@@ -27,17 +27,17 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Winsorize to +/- 2 std
 winsorized = winsorize(momentum, std=1.0)
 
 print("winsorize() - Clip to mean +/- n*std")
 print("=" * 50)
-print("\nOriginal 20-day momentum:")
-print(momentum.tail(3))
+print("\nOriginal 5-day momentum:")
+print(momentum.head(7))
 print("\nWinsorized (+/-2 std):")
-print(winsorized.tail(3))
+print(winsorized.head(7))
 
 # Cleanup
 client.close()

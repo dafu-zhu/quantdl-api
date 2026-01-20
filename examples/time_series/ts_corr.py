@@ -11,7 +11,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day rolling price-volume correlation
+    5-day rolling price-volume correlation
 """
 from dotenv import load_dotenv
 
@@ -33,8 +33,8 @@ price_vol_corr = ts_corr(prices, volume, 5)
 
 print("ts_corr() - Rolling correlation")
 print("=" * 50)
-print("\n20-day rolling price-volume correlation:")
-print(price_vol_corr.head(10))
+print("\n5-day rolling price-volume correlation:")
+print(price_vol_corr.head(7))
 
 # Cleanup
 client.close()

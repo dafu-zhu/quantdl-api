@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day rolling low
+    5-day rolling low
 """
 from dotenv import load_dotenv
 
@@ -26,15 +26,15 @@ client = QuantDLClient()
 symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
-# Calculate 20-day rolling low
+# Calculate 5-day rolling low
 rolling_low = ts_min(prices, 5)
 
 print("ts_min() - Rolling minimum")
 print("=" * 50)
 print("\nPrices:")
-print(prices.head(5))
-print("\n20-day rolling low:")
-print(rolling_low.head(5))
+print(prices.head(7))
+print("\n5-day rolling low:")
+print(rolling_low.head(7))
 
 # Cleanup
 client.close()

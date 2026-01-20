@@ -47,23 +47,23 @@ print("if_else() - Conditional selection")
 print("=" * 50)
 print("\nExample 1: Cap returns at +/- 5%")
 print("Original returns:")
-print(daily_return.tail(3))
+print(daily_return.head(7))
 print("Capped returns:")
-print(capped_return.tail(3))
+print(capped_return.head(7))
 
 # Example 2: Adaptive alpha with DataFrame branches
-ma_20 = ts_mean(prices, 20)
-above_ma = gt(prices, ma_20)
+ma_5 = ts_mean(prices, 5)
+above_ma = gt(prices, ma_5)
 
-momentum_alpha = rank(ts_delta(prices, 20))
-mean_rev_alpha = reverse(rank(ts_delta(prices, 5)))
+momentum_alpha = rank(ts_delta(prices, 5))
+mean_rev_alpha = reverse(rank(ts_delta(prices, 3)))
 
 adaptive_alpha = if_else(above_ma, momentum_alpha, mean_rev_alpha)
 
 print("\nExample 2: Adaptive alpha")
 print("Above MA -> momentum, Below MA -> mean reversion")
 print("Adaptive alpha:")
-print(adaptive_alpha.tail(3))
+print(adaptive_alpha.head(7))
 
 # Cleanup
 client.close()

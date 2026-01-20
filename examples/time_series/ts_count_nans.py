@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    Count of NaN values in 10-day window
+    Count of NaN values in 5-day window
 """
 from dotenv import load_dotenv
 
@@ -35,9 +35,9 @@ nan_count = ts_count_nans(daily_change, 5)
 print("ts_count_nans() - Count nulls in window")
 print("=" * 50)
 print("\nDaily change (first rows have NaN):")
-print(daily_change.head(5))
-print("\nNaN count in 10-day window:")
-print(nan_count.head(15))
+print(daily_change.head(7))
+print("\nNaN count in 5-day window:")
+print(nan_count.head(7))
 
 # Cleanup
 client.close()

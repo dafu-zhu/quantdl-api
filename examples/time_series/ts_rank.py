@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    Percentile rank in 20-day window
+    Percentile rank in 5-day window
 """
 from dotenv import load_dotenv
 
@@ -32,9 +32,9 @@ percentile = ts_rank(prices, 5)
 print("ts_rank() - Percentile rank in window")
 print("=" * 50)
 print("\nPrices:")
-print(prices.head(10))
-print("\nPercentile rank in 20-day window:")
-print(percentile.head(10))
+print(prices.head(7))
+print("\nPercentile rank in 5-day window:")
+print(percentile.head(7))
 
 # Cleanup
 client.close()

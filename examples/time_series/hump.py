@@ -27,7 +27,7 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate price z-score
-price_zscore = ts_zscore(prices, 20)
+price_zscore = ts_zscore(prices, 5)
 
 # Smooth with hump (max 0.5 change per period)
 smooth_signal = hump(price_zscore, 0.5)
@@ -35,9 +35,9 @@ smooth_signal = hump(price_zscore, 0.5)
 print("hump() - Limit change magnitude")
 print("=" * 50)
 print("\nOriginal z-score:")
-print(price_zscore.tail(20))
+print(price_zscore.head(7))
 print("\nSmoothed z-score (max 0.5 change per period):")
-print(smooth_signal.tail(20))
+print(smooth_signal.head(7))
 
 # Cleanup
 client.close()

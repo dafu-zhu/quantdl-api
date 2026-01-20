@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day cumulative volume
+    5-day cumulative volume
 """
 from dotenv import load_dotenv
 

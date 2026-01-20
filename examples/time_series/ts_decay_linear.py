@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    10-day linear decay weighted average
+    5-day linear decay weighted average
 """
 from dotenv import load_dotenv
 
@@ -32,9 +32,9 @@ decay_avg = ts_decay_linear(prices, 5)
 print("ts_decay_linear() - Linear decay weighted average")
 print("=" * 50)
 print("\nPrices:")
-print(prices.head(10))
-print("\n10-day linear decay weighted average:")
-print(decay_avg.head(10))
+print(prices.head(7))
+print("\n5-day linear decay weighted average:")
+print(decay_avg.head(7))
 
 # Cleanup
 client.close()

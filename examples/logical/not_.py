@@ -41,9 +41,9 @@ not_volatile = not_(volatile)
 print("not_() - Logical NOT")
 print("=" * 50)
 print("\nVolatile days:")
-print(volatile.tail(3))
+print(volatile.head(3))
 print("\nNot volatile (calm days):")
-print(not_volatile.tail(3))
+print(not_volatile.head(3))
 
 # Cleanup
 client.close()

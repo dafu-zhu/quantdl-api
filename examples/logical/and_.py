@@ -27,10 +27,10 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Create two conditions
-ma_20 = ts_mean(prices, 20)
-above_ma = gt(prices, ma_20)
+ma_5 = ts_mean(prices, 5)
+above_ma = gt(prices, ma_5)
 
-momentum = ts_delta(prices, 5)
+momentum = ts_delta(prices, 3)
 pos_momentum = gt(momentum, 0)
 
 # Combine with AND
@@ -38,12 +38,12 @@ buy_signal = and_(above_ma, pos_momentum)
 
 print("and_() - Logical AND")
 print("=" * 50)
-print("\nAbove 20-day MA:")
-print(above_ma.tail(3))
-print("\nPositive 5-day momentum:")
-print(pos_momentum.tail(3))
+print("\nAbove 5-day MA:")
+print(above_ma.head(7))
+print("\nPositive 3-day momentum:")
+print(pos_momentum.head(7))
 print("\nBuy signal (above MA AND positive momentum):")
-print(buy_signal.tail(3))
+print(buy_signal.head(7))
 
 # Cleanup
 client.close()

@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    Days since 20-day high
+    Days since 4-day high
 """
 from dotenv import load_dotenv
 
@@ -33,7 +33,7 @@ print("ts_arg_max() - Days since window maximum")
 print("=" * 50)
 print("\nPrices:")
 print(prices.head(7))
-print("\nDays since 20-day high (0 = today is high):")
+print("\nDays since 4-day high (0 = today is high):")
 print(days_since_high.head(7))
 
 # Cleanup

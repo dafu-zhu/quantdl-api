@@ -26,20 +26,20 @@ client = QuantDLClient()
 symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
-# Calculate 20-day moving average
-ma_20 = ts_mean(prices, 20)
+# Calculate 5-day moving average
+ma_5 = ts_mean(prices, 5)
 
 # Compare: price > MA
-above_ma = gt(prices, ma_20)
+above_ma = gt(prices, ma_5)
 
 print("gt() - Greater than comparison (>)")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(3))
-print("\n20-day MA:")
-print(ma_20.tail(3))
+print(prices.head(7))
+print("\n5-day MA:")
+print(ma_5.head(7))
 print("\nPrice > MA (True/False):")
-print(above_ma.tail(3))
+print(above_ma.head(7))
 
 # Cleanup
 client.close()

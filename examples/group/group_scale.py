@@ -45,17 +45,17 @@ groups = prices.select(
 )
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Scale within sector
 sector_scaled = group_scale(momentum, groups)
 
 print("group_scale() - Min-max scale within groups")
 print("=" * 50)
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nMomentum scaled within sector [0, 1]:")
-print(sector_scaled.tail(3))
+print(sector_scaled.head(7))
 
 # Cleanup
 client.close()

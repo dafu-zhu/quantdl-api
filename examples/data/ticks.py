@@ -43,11 +43,8 @@ prices = client.ticks(
 )
 
 print(f"\nShape: {prices.shape}")
-print("\nFirst 5 rows:")
-print(prices.head())
-
-print("\nLast 5 rows:")
-print(prices.tail())
+print("\nFirst 7 rows (raw data has no nulls):")
+print(prices.head(7))
 
 # Fetch volume data
 print("\n" + "="*50)

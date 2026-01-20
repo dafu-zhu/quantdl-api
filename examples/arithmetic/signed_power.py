@@ -43,9 +43,9 @@ sqrt_returns = signed_power(returns, exp_half)
 print("signed_power() - Sign-preserving exponentiation")
 print("=" * 50)
 print("\nOriginal returns (can be negative):")
-print(returns.tail(5))
+print(returns.head(5))
 print("\nSigned sqrt of returns (preserves direction):")
-print(sqrt_returns.tail(5))
+print(sqrt_returns.head(5))
 
 # Cleanup
 client.close()

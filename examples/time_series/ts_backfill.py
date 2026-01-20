@@ -28,7 +28,7 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Create sparse data with NaN gaps in the middle (simulating missing data)
-sparse = prices.head(10).with_columns(
+sparse = prices.head(7).with_columns(
     pl.when(pl.col("IBM").is_not_null() & (pl.int_range(pl.len()) >= 2) & (pl.int_range(pl.len()) <= 4))
     .then(pl.lit(None))
     .otherwise(pl.col("IBM"))

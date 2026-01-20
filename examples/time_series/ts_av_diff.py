@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    Deviation from 20-day mean
+    Deviation from 5-day mean
 """
 from dotenv import load_dotenv
 
@@ -26,15 +26,15 @@ client = QuantDLClient()
 symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
-# Calculate deviation from 20-day mean
+# Calculate deviation from 5-day mean
 price_dev = ts_av_diff(prices, 5)
 
 print("ts_av_diff() - Deviation from rolling mean")
 print("=" * 50)
 print("\nPrices:")
-print(prices.head(10))
-print("\nDeviation from 20-day mean:")
-print(price_dev.head(10))
+print(prices.head(7))
+print("\nDeviation from 5-day mean:")
+print(price_dev.head(7))
 
 # Cleanup
 client.close()

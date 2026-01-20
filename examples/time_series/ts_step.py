@@ -31,7 +31,7 @@ time_idx = ts_step(prices)
 print("ts_step() - Row counter")
 print("=" * 50)
 print("\nRow counter (0, 1, 2, ...):")
-print(time_idx.head(10))
+print(time_idx.head(7))
 
 # Cleanup
 client.close()

@@ -35,9 +35,9 @@ last_different = last_diff_value(discrete_signal, 3)
 print("last_diff_value() - Last different value")
 print("=" * 50)
 print("\nDiscrete signal (buckets):")
-print(discrete_signal.head(10))
+print(discrete_signal.head(7))
 print("\nLast different value:")
-print(last_different.head(10))
+print(last_different.head(7))
 
 # Cleanup
 client.close()

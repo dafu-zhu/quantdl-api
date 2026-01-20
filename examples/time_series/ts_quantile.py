@@ -32,9 +32,9 @@ gaussian_rank = ts_quantile(prices, 5)
 print("ts_quantile() - Gaussian quantile transform")
 print("=" * 50)
 print("\nPrices:")
-print(prices.head(10))
+print(prices.head(7))
 print("\nGaussian quantile transform:")
-print(gaussian_rank.head(10))
+print(gaussian_rank.head(7))
 
 # Cleanup
 client.close()

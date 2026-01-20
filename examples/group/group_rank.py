@@ -46,7 +46,7 @@ groups = prices.select(
 )
 
 # Calculate momentum
-momentum = ts_delta(prices, 20)
+momentum = ts_delta(prices, 5)
 
 # Rank within sector
 sector_rank = group_rank(momentum, groups)
@@ -55,10 +55,10 @@ print("group_rank() - Rank within groups")
 print("=" * 50)
 print("\nSector groups (1=Tech, 2=Health, 3=Defense, 4=Utilities):")
 print(groups.head(1))
-print("\n20-day momentum:")
-print(momentum.tail(3))
+print("\n5-day momentum:")
+print(momentum.head(7))
 print("\nMomentum rank within sector:")
-print(sector_rank.tail(3))
+print(sector_rank.head(7))
 
 # Cleanup
 client.close()

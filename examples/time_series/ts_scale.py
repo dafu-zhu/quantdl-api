@@ -10,7 +10,7 @@ Parameters:
     d: Window size (number of periods)
 
 Example output:
-    20-day scaled price (0 = at low, 1 = at high)
+    5-day scaled price (0 = at low, 1 = at high)
 """
 from dotenv import load_dotenv
 
@@ -26,7 +26,7 @@ client = QuantDLClient()
 symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
-# Calculate 20-day scaled price
+# Calculate 5-day scaled price
 scaled_price = ts_scale(prices, 5)
 
 print("ts_scale() - Rolling min-max scale [0, 1]")

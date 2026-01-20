@@ -40,9 +40,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/quantdl/quantdl-api"
-Documentation = "https://github.com/quantdl/quantdl-api#readme"
-Repository = "https://github.com/quantdl/quantdl-api"
+Homepage = "https://github.com/dafu-zhu/quantdl-api"
+Documentation = "https://github.com/dafu-zhu/quantdl-api/blob/main/docs/user-guide.md"
+Repository = "https://github.com/dafu-zhu/quantdl-api"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/quantdl"]

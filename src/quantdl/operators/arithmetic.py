@@ -109,10 +109,11 @@ def multiply(*args: pl.DataFrame | float | int, filter: bool = False) -> pl.Data
 
     # Check if all scalars
     if all(isinstance(a, (int, float)) for a in args):
-        result = 1
+        scalar_result: float | int = 1
         for a in args:
-            result *= a
-        return result
+            assert isinstance(a, (int, float))
+            scalar_result *= a
+        return scalar_result
 
     # Find first DataFrame to get structure
     first_df = next(a for a in args if isinstance(a, pl.DataFrame))
@@ -121,22 +122,22 @@ def multiply(*args: pl.DataFrame | float | int, filter: bool = False) -> pl.Data
 
     # Start with first arg
     if isinstance(args[0], (int, float)):
-        result = first_df.select(
+        df_result: pl.DataFrame = first_df.select(
             pl.col(date_col),
             *[pl.lit(args[0]).alias(c) for c in value_cols],
         )
     else:
-        result = args[0]
+        df_result = args[0]
 
     for arg in args[1:]:
         if isinstance(arg, (int, float)):
             # Scalar multiplication
-            result = result.select(
+            df_result = df_result.select(
                 pl.col(date_col),
                 *[(pl.col(c) * arg).alias(c) for c in value_cols],
             )
         elif filter:
-            result = result.select(
+            df_result = df_result.select(
                 pl.col(date_col),
                 *[
                     (pl.col(c).fill_null(1) * arg[c].fill_null(1)).alias(c)
@@ -144,11 +145,11 @@ def multiply(*args: pl.DataFrame | float | int, filter: bool = False) -> pl.Data
                 ],
             )
         else:
-            result = result.select(
+            df_result = df_result.select(
                 pl.col(date_col),
                 *[(pl.col(c) * arg[c]).alias(c) for c in value_cols],
             )
-    return result
+    return df_result
 
 
 def divide(x: pl.DataFrame, y: pl.DataFrame) -> pl.DataFrame:
@@ -295,6 +296,7 @@ def power(x: pl.DataFrame | float | int, y: pl.DataFrame | float | int) -> pl.Da
 
     # Case 1: x is scalar, y is DataFrame
     if isinstance(x, (int, float)):
+        assert isinstance(y, pl.DataFrame)
         date_col = y.columns[0]
         value_cols = _get_value_cols(y)
         return y.select(

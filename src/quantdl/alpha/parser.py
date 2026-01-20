@@ -204,7 +204,7 @@ class SafeEvaluator(ast.NodeVisitor):
         if self.ops is not None and hasattr(self.ops, name):
             func = getattr(self.ops, name)
             if callable(func):
-                return func  # type: ignore[return-value]
+                return func  # type: ignore[no-any-return]
         raise AlphaParseError(f"Unknown variable: {name}")
 
     def visit_Attribute(self, node: ast.Attribute) -> Any:

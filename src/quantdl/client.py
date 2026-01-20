@@ -114,11 +114,18 @@ class QuantDLClient:
                 result.append((sym, info))
         return result
 
-    def _align_to_calendar(self, wide: pl.DataFrame, start: date, end: date) -> pl.DataFrame:
+    def _align_to_calendar(
+        self, wide: pl.DataFrame, start: date, end: date, forward_fill: bool = False
+    ) -> pl.DataFrame:
         """Align wide table rows to trading calendar."""
         trading_days = self._calendar_master.get_trading_days(start, end)
         calendar_df = pl.DataFrame({"timestamp": trading_days})
-        return calendar_df.join(wide, on="timestamp", how="left").sort("timestamp")
+        aligned = calendar_df.join(wide, on="timestamp", how="left").sort("timestamp")
+        if forward_fill:
+            # Forward fill all columns except timestamp
+            value_cols = [c for c in aligned.columns if c != "timestamp"]
+            aligned = aligned.with_columns([pl.col(c).forward_fill() for c in value_cols])
+        return aligned
 
     def _fetch_ticks_single(
         self,
@@ -160,21 +167,21 @@ class QuantDLClient:
     ) -> list[tuple[str, pl.DataFrame]]:
         """Fetch daily data for multiple securities concurrently."""
         loop = asyncio.get_event_loop()
-        tasks = []
+        futures: list[tuple[str, asyncio.Future[pl.DataFrame | None]]] = []
 
         for symbol, info in securities:
-            task = loop.run_in_executor(
+            future = loop.run_in_executor(
                 self._executor,
                 self._fetch_ticks_single,
                 info.security_id,
                 start,
                 end,
             )
-            tasks.append((symbol, task))
+            futures.append((symbol, future))
 
         results: list[tuple[str, pl.DataFrame]] = []
-        for symbol, task in tasks:
-            df = await task
+        for symbol, future in futures:
+            df = await future
             if df is not None and len(df) > 0:
                 results.append((symbol, df))
 
@@ -250,63 +257,70 @@ class QuantDLClient:
         # Align to trading calendar
         return self._align_to_calendar(wide, start, end)
 
-    def _fetch_fundamentals_single(
-        self,
-        cik: str,
-        start: date,
-        end: date,
-    ) -> pl.DataFrame | None:
-        """Fetch fundamentals for single security by CIK."""
-        path = f"data/raw/fundamental/{cik}/fundamental.parquet"
+    def _fetch_fundamentals_single(self, cik: str, end: date) -> pl.DataFrame | None:
+        """Fetch fundamentals for single security by CIK.
 
-        # Try cache first
+        Fetches all data up to end date (no start filter) to allow forward-fill.
+        """
+        path = f"data/raw/fundamental/{cik}/fundamental.parquet"
+        date_filter = pl.col("as_of_date") <= end
+
         cached = self._cache.get(path)
         if cached is not None:
-            return cached.filter(
-                (pl.col("as_of_date") >= start) & (pl.col("as_of_date") <= end)
-            )
+            return cached.filter(date_filter)
 
         try:
             df = self._storage.read_parquet(path)
-            # Cast as_of_date to date if it's a string
             if df.schema["as_of_date"] == pl.String:
                 df = df.with_columns(pl.col("as_of_date").str.to_date())
             self._cache.put(path, df)
-            return df.filter(
-                (pl.col("as_of_date") >= start) & (pl.col("as_of_date") <= end)
-            )
+            return df.filter(date_filter)
         except Exception:
             return None
 
     async def _fetch_fundamentals_async(
         self,
         securities: list[tuple[str, SecurityInfo]],
-        start: date,
         end: date,
     ) -> list[tuple[str, pl.DataFrame]]:
         """Fetch fundamentals for multiple securities concurrently."""
         loop = asyncio.get_event_loop()
-        tasks = []
+        futures: list[tuple[str, asyncio.Future[pl.DataFrame | None]]] = []
 
         for symbol, info in securities:
             if info.cik is None:
                 continue
-            task = loop.run_in_executor(
-                self._executor,
-                self._fetch_fundamentals_single,
-                info.cik,
-                start,
-                end,
+            future = loop.run_in_executor(
+                self._executor, self._fetch_fundamentals_single, info.cik, end
             )
-            tasks.append((symbol, task))
+            futures.append((symbol, future))
 
         results: list[tuple[str, pl.DataFrame]] = []
-        for symbol, task in tasks:
-            df = await task
+        for symbol, future in futures:
+            df = await future
             if df is not None and len(df) > 0:
                 results.append((symbol, df))
 
         return results
+
+    def _extract_fundamental_values(
+        self, df: pl.DataFrame, concept: str, symbol: str
+    ) -> pl.DataFrame | None:
+        """Extract fundamental concept values from DataFrame.
+
+        Filters by concept, deduplicates by date, and formats for pivot.
+        """
+        filtered = df.filter(pl.col("concept") == concept)
+        if len(filtered) == 0:
+            return None
+
+        result = filtered.select(
+            pl.col("as_of_date").alias("timestamp"),
+            pl.lit(symbol).alias("symbol"),
+            pl.col("value"),
+        )
+        # Deduplicate: take first value per timestamp
+        return result.group_by(["timestamp", "symbol"]).agg(pl.col("value").first())
 
     def fundamentals(
         self,
@@ -341,82 +355,71 @@ class QuantDLClient:
         if not resolved:
             raise DataNotFoundError("fundamentals", ", ".join(symbols))
 
-        results = asyncio.run(self._fetch_fundamentals_async(resolved, start, end))
-
+        results = asyncio.run(self._fetch_fundamentals_async(resolved, end))
         if not results:
             raise DataNotFoundError("fundamentals", ", ".join(symbols))
 
-        # Filter by concept and build wide table
         dfs: list[pl.DataFrame] = []
         for symbol, df in results:
-            filtered = df.filter(pl.col("concept") == concept)
-            if len(filtered) > 0:
-                dfs.append(
-                    filtered.select(
-                        pl.col("as_of_date").alias("timestamp"),
-                        pl.lit(symbol).alias("symbol"),
-                        pl.col("value"),
-                    )
-                )
+            extracted = self._extract_fundamental_values(df, concept, symbol)
+            if extracted is not None:
+                dfs.append(extracted)
 
         if not dfs:
             raise DataNotFoundError("fundamentals", f"concept={concept}")
 
         combined = pl.concat(dfs)
-        # Deduplicate: take first value per (timestamp, symbol)
-        combined = combined.group_by(["timestamp", "symbol"]).agg(pl.col("value").first())
         wide = combined.pivot(values="value", index="timestamp", on="symbol")
-        return self._align_to_calendar(wide, start, end)
 
-    def _fetch_metrics_single(
-        self,
-        cik: str,
-        start: date,
-        end: date,
-    ) -> pl.DataFrame | None:
-        """Fetch metrics for single security by CIK."""
+        # Align from earliest data to allow forward-fill into requested range
+        earliest_val = wide["timestamp"].min()
+        earliest = earliest_val if isinstance(earliest_val, date) else None
+        align_start = min(earliest, start) if earliest else start
+        aligned = self._align_to_calendar(wide, align_start, end, forward_fill=True)
+
+        return aligned.filter(pl.col("timestamp") >= start)
+
+    def _fetch_metrics_single(self, cik: str, end: date) -> pl.DataFrame | None:
+        """Fetch metrics for single security by CIK.
+
+        Fetches all data up to end date (no start filter) to allow forward-fill.
+        """
         path = f"data/derived/features/fundamental/{cik}/metrics.parquet"
+        date_filter = pl.col("as_of_date") <= end
 
         cached = self._cache.get(path)
         if cached is not None:
-            return cached.filter(
-                (pl.col("as_of_date") >= start) & (pl.col("as_of_date") <= end)
-            )
+            return cached.filter(date_filter)
 
         try:
             df = self._storage.read_parquet(path)
+            if df.schema["as_of_date"] == pl.String:
+                df = df.with_columns(pl.col("as_of_date").str.to_date())
             self._cache.put(path, df)
-            return df.filter(
-                (pl.col("as_of_date") >= start) & (pl.col("as_of_date") <= end)
-            )
+            return df.filter(date_filter)
         except Exception:
             return None
 
     async def _fetch_metrics_async(
         self,
         securities: list[tuple[str, SecurityInfo]],
-        start: date,
         end: date,
     ) -> list[tuple[str, pl.DataFrame]]:
         """Fetch metrics for multiple securities concurrently."""
         loop = asyncio.get_event_loop()
-        tasks = []
+        futures: list[tuple[str, asyncio.Future[pl.DataFrame | None]]] = []
 
         for symbol, info in securities:
             if info.cik is None:
                 continue
-            task = loop.run_in_executor(
-                self._executor,
-                self._fetch_metrics_single,
-                info.cik,
-                start,
-                end,
+            future = loop.run_in_executor(
+                self._executor, self._fetch_metrics_single, info.cik, end
             )
-            tasks.append((symbol, task))
+            futures.append((symbol, future))
 
         results: list[tuple[str, pl.DataFrame]] = []
-        for symbol, task in tasks:
-            df = await task
+        for symbol, future in futures:
+            df = await future
             if df is not None and len(df) > 0:
                 results.append((symbol, df))
 
@@ -438,7 +441,7 @@ class QuantDLClient:
             end: End date
 
         Returns:
-            Wide DataFrame with as_of_date as first column, symbols as other columns
+            Wide DataFrame with timestamp as first column, symbols as other columns
         """
         if isinstance(symbols, str):
             symbols = [symbols]
@@ -455,29 +458,58 @@ class QuantDLClient:
         if not resolved:
             raise DataNotFoundError("metrics", ", ".join(symbols))
 
-        results = asyncio.run(self._fetch_metrics_async(resolved, start, end))
-
+        results = asyncio.run(self._fetch_metrics_async(resolved, end))
         if not results:
             raise DataNotFoundError("metrics", ", ".join(symbols))
 
         dfs: list[pl.DataFrame] = []
         for symbol, df in results:
-            if metric not in df.columns:
-                continue
-            dfs.append(
-                df.select(
-                    pl.col("as_of_date").alias("timestamp"),
-                    pl.lit(symbol).alias("symbol"),
-                    pl.col(metric).alias("value"),
-                )
-            )
+            extracted = self._extract_metric_values(df, metric, symbol)
+            if extracted is not None:
+                dfs.append(extracted)
 
         if not dfs:
             raise DataNotFoundError("metrics", f"metric={metric}")
 
         combined = pl.concat(dfs)
         wide = combined.pivot(values="value", index="timestamp", on="symbol")
-        return self._align_to_calendar(wide, start, end)
+
+        # Align from earliest data to allow forward-fill into requested range
+        earliest_val = wide["timestamp"].min()
+        earliest = earliest_val if isinstance(earliest_val, date) else None
+        align_start = min(earliest, start) if earliest else start
+        aligned = self._align_to_calendar(wide, align_start, end, forward_fill=True)
+
+        return aligned.filter(pl.col("timestamp") >= start)
+
+    def _extract_metric_values(
+        self, df: pl.DataFrame, metric: str, symbol: str
+    ) -> pl.DataFrame | None:
+        """Extract metric values from DataFrame, handling long or wide format.
+
+        Long format: columns include 'metric' and 'value'
+        Wide format: metric name is a column name
+        """
+        is_long_format = "metric" in df.columns and "value" in df.columns
+
+        if is_long_format:
+            filtered = df.filter(pl.col("metric") == metric)
+            if len(filtered) == 0:
+                return None
+            return filtered.select(
+                pl.col("as_of_date").alias("timestamp"),
+                pl.lit(symbol).alias("symbol"),
+                pl.col("value"),
+            )
+
+        if metric in df.columns:
+            return df.select(
+                pl.col("as_of_date").alias("timestamp"),
+                pl.lit(symbol).alias("symbol"),
+                pl.col(metric).alias("value"),
+            )
+
+        return None
 
     def universe(self, name: str = "top3000") -> list[str]:
         """Load universe of symbols.

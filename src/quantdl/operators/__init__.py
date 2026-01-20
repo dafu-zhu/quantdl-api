@@ -37,6 +37,7 @@ from quantdl.operators.arithmetic import (
     subtract,
 )
 from quantdl.operators.cross_sectional import (
+    bucket,
     normalize,
     quantile,
     rank,
@@ -129,6 +130,7 @@ __all__ = [
     "ts_quantile",
     "ts_regression",
     # Cross-sectional operators
+    "bucket",
     "rank",
     "zscore",
     "normalize",

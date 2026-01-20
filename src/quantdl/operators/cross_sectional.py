@@ -377,3 +377,47 @@ def winsorize(x: pl.DataFrame, std: float = 4.0) -> pl.DataFrame:
         pl.col(c).clip(lower, upper).alias(c)
         for c in value_cols
     ])
+
+
+def bucket(x: pl.DataFrame, range_spec: str) -> pl.DataFrame:
+    """Assign values to discrete buckets based on range specification.
+
+    Buckets values into discrete bins. Each value is assigned the lower bound
+    of the bucket it falls into. Values outside the range are clipped to the
+    nearest bucket.
+
+    Args:
+        x: Wide DataFrame with date + symbol columns
+        range_spec: Comma-separated "start,end,step" (e.g., "0,1,0.25")
+            Creates buckets: [0, 0.25), [0.25, 0.5), [0.5, 0.75), [0.75, 1.0]
+
+    Returns:
+        Wide DataFrame with bucket lower bounds as values
+
+    Examples:
+        >>> # Bucket ranked values into quartiles
+        >>> bucket(rank(prices), range_spec="0,1,0.25")
+        >>> # Values: 0.1 -> 0.0, 0.3 -> 0.25, 0.6 -> 0.5, 0.9 -> 0.75
+    """
+    # Parse range_spec
+    parts = range_spec.split(",")
+    if len(parts) != 3:
+        raise ValueError(f"range_spec must be 'start,end,step', got: {range_spec}")
+
+    start, end, step = float(parts[0]), float(parts[1]), float(parts[2])
+
+    if step <= 0:
+        raise ValueError(f"step must be positive, got: {step}")
+
+    value_cols = _get_value_cols(x)
+
+    # Create bucket boundaries
+    # Values are assigned to floor((value - start) / step) * step + start
+    # Clipped to [start, end - step]
+    return x.with_columns([
+        (
+            (((pl.col(c) - start) / step).floor() * step + start)
+            .clip(start, end - step)
+        ).alias(c)
+        for c in value_cols
+    ])

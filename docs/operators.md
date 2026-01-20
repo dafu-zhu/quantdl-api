@@ -86,15 +86,6 @@
 
 ---
 
-## **Transformational Operators**
-
-| Operator                                  | Description                                       |
-| ----------------------------------------- | ------------------------------------------------- |
-| `bucket(rank(x), range=..., buckets=...)` | Convert values into bucket indices                |
-| `trade_when(x, y, z)`                     | Change alpha only under condition; otherwise hold |
-
----
-
 ## **Group Operators**
 
 | Operator                               | Description                               |

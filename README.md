@@ -1,5 +1,31 @@
 # QuantDL
 
+[![CI](https://github.com/dafu-zhu/quantdl-api/actions/workflows/ci.yml/badge.svg)](https://github.com/dafu-zhu/quantdl-api/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Coverage](https://img.shields.io/badge/coverage-80%25+-brightgreen.svg)](https://github.com/dafu-zhu/quantdl-api/actions)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![mypy](https://img.shields.io/badge/type%20checker-mypy-blue.svg)](https://mypy-lang.org/)
+[![Polars](https://img.shields.io/badge/dataframe-Polars-CD792C.svg)](https://pola.rs/)
+[![Hatch](https://img.shields.io/badge/build-Hatch-4051b5.svg)](https://hatch.pypa.io/)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+
+[![GitHub stars](https://img.shields.io/github/stars/dafu-zhu/quantdl-api?style=social)](https://github.com/dafu-zhu/quantdl-api/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/dafu-zhu/quantdl-api?style=social)](https://github.com/dafu-zhu/quantdl-api/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/dafu-zhu/quantdl-api)](https://github.com/dafu-zhu/quantdl-api/issues)
+[![GitHub last commit](https://img.shields.io/github/last-commit/dafu-zhu/quantdl-api)](https://github.com/dafu-zhu/quantdl-api/commits/main)
+[![GitHub repo size](https://img.shields.io/github/repo-size/dafu-zhu/quantdl-api)](https://github.com/dafu-zhu/quantdl-api)
+
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Imports: isort](https://img.shields.io/badge/imports-isort-1674b1.svg)](https://pycqa.github.io/isort/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com/)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+
+[![AWS S3](https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
+[![Typed](https://img.shields.io/badge/typed-strict-blue.svg)](https://peps.python.org/pep-0484/)
+[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/dafu-zhu/quantdl-api)
+
 Financial data library for alpha research. Fetches data from S3, returns wide tables, includes local caching and composable operators.
 
 ## Installation
@@ -18,7 +44,7 @@ from quantdl.operators import ts_mean, rank, zscore
 client = QuantDLClient()
 
 # Get daily closing prices for multiple symbols
-prices = client.daily(["AAPL", "MSFT", "GOOGL"], "close", "2024-01-01", "2024-12-31")
+prices = client.ticks(["AAPL", "MSFT", "GOOGL"], "close", "2024-01-01", "2024-12-31")
 # Returns wide table: timestamp | AAPL | MSFT | GOOGL
 
 # Apply operators
@@ -53,19 +79,20 @@ client = QuantDLClient(
 
 ```python
 # Daily prices (OHLCV)
-df = client.daily(
+df = client.ticks(
     symbols=["AAPL", "MSFT"],   # Symbol(s)
     field="close",              # open, high, low, close, volume
     start="2024-01-01",
     end="2024-12-31"
 )
 
-# Fundamentals
+# Fundamentals (balance sheet items use quarterly, income/cash flow use TTM by default)
 df = client.fundamentals(
     symbols=["AAPL"],
-    concept="Revenue",          # Revenue, NetIncome, etc.
+    concept="rev",              # rev, net_inc, ta, tl, etc.
     start="2024-01-01",
-    end="2024-12-31"
+    end="2024-12-31",
+    source="ttm"                # "ttm" (trailing 12mo) or "raw" (quarterly)
 )
 
 # Derived metrics
@@ -81,6 +108,10 @@ symbols = client.universe("top3000")
 
 # Resolve symbol to security info
 info = client.resolve("AAPL", as_of=date(2024, 1, 1))
+
+# Request tracking
+count = client.request_count()       # S3 requests this session
+stats = client.request_stats()       # Detailed stats with daily breakdown
 ```
 
 ### Operators

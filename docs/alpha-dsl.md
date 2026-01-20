@@ -4,11 +4,10 @@ Domain-specific language for composing alpha expressions with operator overloadi
 
 ## Overview
 
-The Alpha DSL provides three ways to build alpha expressions:
+The Alpha DSL provides two ways to build alpha expressions:
 
-1. **AlphaSession** - Unified session with automatic data fetching (recommended)
-2. **Alpha class** - Python operator overloading (`+`, `-`, `*`, `/`, `<`, `>`, etc.)
-3. **alpha_eval()** - String-based DSL for dynamic expressions
+1. **Alpha class** - Python operator overloading (`+`, `-`, `*`, `/`, `<`, `>`, etc.)
+2. **alpha_eval()** - String-based DSL for dynamic expressions (GP/RL compatible)
 
 All work on **wide DataFrames**: first column is date, remaining columns are symbols.
 
@@ -21,93 +20,15 @@ timestamp   | AAPL  | MSFT  | GOOGL
 ## Installation
 
 ```python
-from quantdl.alpha import Alpha, AlphaSession, alpha_eval
+from quantdl.alpha import Alpha, alpha_eval
 import quantdl.operators as ops
 ```
 
-## AlphaSession (Recommended)
-
-AlphaSession provides unified access to S3 data with automatic fetching, caching, and operator integration.
-
-### Basic Usage
-
-```python
-with AlphaSession(client, ["AAPL", "MSFT", "GOOGL"], "2024-01-01", "2024-12-31") as s:
-    close = s.close    # Lazy fetch, returns Alpha
-    volume = s.volume  # Cached on first access
-
-    # Alpha arithmetic works directly
-    returns = close / Alpha(ops.ts_delay(close.data, 1)) - 1
-    signal = returns * volume
-
-    # Use .data for operators
-    ranked = ops.rank(-ops.ts_delta(close.data, 5))
-```
-
-### Available Fields
-
-| Field | Source | Description |
-|-------|--------|-------------|
-| `close`, `open`, `high`, `low`, `volume` | ticks | OHLCV data |
-| `price` | ticks | Alias for close |
-| `revenue`, `net_income` | fundamentals | SEC filings |
-| `pe`, `pb` | metrics | Valuation ratios |
-
-### String DSL with Session
-
-```python
-with AlphaSession(client, symbols, start, end) as s:
-    alpha = s.eval("ops.rank(-ops.ts_delta(close, 5))")
-```
-
-### Batch Fetch
-
-```python
-with AlphaSession(client, symbols, start, end) as s:
-    data = s.fetch("close", "volume", "open")  # dict[str, Alpha]
-    close, volume, open_ = data["close"], data["volume"], data["open"]
-```
-
-### Eager Mode
-
-Prefetch fields on session start:
-
-```python
-with AlphaSession(client, symbols, start, end, eager=True, fields=["close", "volume"]) as s:
-    # close and volume already cached
-    signal = s.close * s.volume
-```
-
-### Custom Field Registration
-
-```python
-with AlphaSession(client, symbols, start, end) as s:
-    s.register("vwap", DataSpec("ticks", "vwap"))
-    signal = s.vwap / s.close
-```
-
-### Chunking for Large Universes
-
-For 3000+ symbols, use chunking to avoid OOM:
-
-```python
-with AlphaSession(client, symbols, start, end, chunk_size=500) as s:
-    # Internally processes 500 symbols at a time, combines results
-    alpha = s.close
-```
-
-### Thread Safety
-
-AlphaSession is thread-safe for concurrent access:
-
-```python
-with AlphaSession(client, symbols, start, end) as s:
-    # Safe to access from multiple threads
-    # First access fetches, subsequent accesses use cache
-    close = s.close
-```
+---
 
 ## Alpha Class
+
+**Location**: `src/quantdl/alpha/core.py`
 
 Wrap a DataFrame to enable operator overloading:
 
@@ -119,9 +40,9 @@ volume = Alpha(volume_df)
 ### Arithmetic
 
 ```python
-returns = close / ops.ts_delay(close.data, 1) - 1    # daily returns
-weighted = returns * volume                           # volume-weighted
-scaled = returns * 100                                # scalar multiply
+returns = close / Alpha(ops.ts_delay(close.data, 1)) - 1  # daily returns
+weighted = returns * volume                                # volume-weighted
+scaled = returns * 100                                     # scalar multiply
 ```
 
 ### Comparisons
@@ -154,6 +75,17 @@ absolute = abs(close) # absolute value (Python builtin works)
 alpha = close * 2
 result_df = alpha.data  # get pl.DataFrame
 ```
+
+### Supported Operators
+
+| Operator | Description |
+|----------|-------------|
+| `+`, `-`, `*`, `/`, `**` | Arithmetic |
+| `<`, `<=`, `>`, `>=`, `==`, `!=` | Comparison |
+| `&`, `\|` | Logical |
+| `-x` | Negation |
+
+---
 
 ## Operators Integration
 
@@ -190,7 +122,11 @@ returns = close_df.select(
 alpha = ops.rank(ops.zscore(returns))
 ```
 
+---
+
 ## String DSL (alpha_eval)
+
+**Location**: `src/quantdl/alpha/parser.py`
 
 Parse and evaluate string expressions safely using AST:
 
@@ -201,21 +137,48 @@ result = alpha_eval(
 )
 ```
 
-### With Operators
-
-Access operators via `ops.` prefix:
+### Signature
 
 ```python
+def alpha_eval(
+    expr: str,
+    variables: dict[str, AlphaLike],
+    ops: Any | None = None,
+) -> Alpha:
+```
+
+### With Operators
+
+Two syntax styles supported:
+
+```python
+# Clean syntax (recommended for GP/RL)
+result = alpha_eval(
+    "rank(-ts_delta(close, 5))",
+    {"close": close_df},
+    ops=ops,
+)
+
+# Legacy syntax (still supported)
 result = alpha_eval(
     "ops.rank(-ops.ts_delta(close, 5))",
     {"close": close_df},
-    ops=ops
+    ops=ops,
 )
 ```
 
 ### Builtin Functions
 
-Available without `ops.` prefix: `abs`, `min`, `max`, `log`, `sqrt`, `sign`
+Available without `ops` parameter:
+
+| Function | Description |
+|----------|-------------|
+| `abs(x)` | Absolute value |
+| `min(x, y, ...)` | Element-wise minimum |
+| `max(x, y, ...)` | Element-wise maximum |
+| `log(x)` | Natural logarithm |
+| `sqrt(x)` | Square root |
+| `sign(x)` | Sign function |
 
 ```python
 result = alpha_eval("min(close, vwap)", {"close": close_df, "vwap": vwap_df})
@@ -235,11 +198,45 @@ result = alpha_eval(
 
 ```python
 result = alpha_eval(
-    "ops.rank(ops.ts_mean(close, 5)) * (volume > ops.ts_mean(volume, 20))",
+    "rank(ts_mean(close, 5)) * (volume > ts_mean(volume, 20))",
     {"close": close_df, "volume": volume_df},
     ops=ops
 )
 ```
+
+### Supported Syntax
+
+| Category | Examples |
+|----------|----------|
+| Variables | Any name in `variables` dict |
+| Literals | `2`, `1.5`, `-3.14` |
+| Binary ops | `+`, `-`, `*`, `/`, `**`, `<`, `<=`, `>`, `>=`, `==`, `!=`, `&`, `\|` |
+| Unary ops | `-`, `+`, `~` |
+| Ternary | `x if cond else y` |
+
+---
+
+## GP/RL Integration
+
+The DSL is designed for genetic programming and reinforcement learning alpha mining:
+
+```python
+import quantdl.operators as ops
+from quantdl.alpha import alpha_eval
+
+# Expression generated by GP/RL agent
+expr = "rank(ts_zscore(ts_delta(close, 5), 20))"
+
+# Evaluate
+alpha = alpha_eval(expr, {"close": close_df}, ops=ops)
+
+# Get underlying DataFrame
+result_df = alpha.data
+```
+
+**Why clean syntax matters**: GP/RL systems generate expression trees. The clean syntax (`rank(...)` vs `ops.rank(...)`) produces shorter, more readable expressions.
+
+---
 
 ## Validation
 
@@ -265,14 +262,14 @@ Scalar operations don't require alignment:
 result = Alpha(close_df) * 2  # always works
 ```
 
+---
+
 ## Type Reference
 
 | Type | Description |
 |------|-------------|
 | `Alpha` | Wrapped DataFrame with operator overloading |
-| `AlphaSession` | Unified session with automatic data fetching |
 | `AlphaLike` | `Alpha`, `pl.DataFrame`, `int`, or `float` |
-| `DataSpec` | Field specification (source, field) for custom fields |
 | `Scalar` | `int` or `float` |
 
 ## Exception Reference
@@ -280,11 +277,11 @@ result = Alpha(close_df) * 2  # always works
 | Exception | Description |
 |-----------|-------------|
 | `AlphaError` | Base exception for alpha operations |
-| `AlphaSessionError` | Base exception for session operations |
-| `FieldNotFoundError` | Unknown field name |
-| `SessionNotActiveError` | Used session outside context manager |
+| `AlphaParseError` | Invalid syntax, unknown variable, unsupported operation |
 | `ColumnMismatchError` | DataFrames have different columns |
 | `DateMismatchError` | DataFrames have different row counts |
+
+---
 
 ## Operator Categories
 
@@ -296,15 +293,20 @@ result = Alpha(close_df) * 2  # always works
 | Logical | `and_`, `or_`, `if_else` | element-wise |
 | Group | `group_rank`, `group_zscore` | grouped rows |
 
+---
+
 ## Example: Momentum Alpha
 
 ```python
+from quantdl import QuantDLClient
 from quantdl.alpha import Alpha
 import quantdl.operators as ops
 
+client = QuantDLClient()
+
 # Load data
-close = client.daily("close", symbols, start, end)
-volume = client.daily("volume", symbols, start, end)
+close = client.ticks(["AAPL", "MSFT", "GOOGL"], "close", "2024-01-01", "2024-12-31")
+volume = client.ticks(["AAPL", "MSFT", "GOOGL"], "volume", "2024-01-01", "2024-12-31")
 
 # 5-day momentum, ranked
 momentum = ops.ts_delta(close, 5)
@@ -312,10 +314,10 @@ ranked = ops.rank(momentum)
 
 # Filter by volume
 avg_volume = ops.ts_mean(volume, 20)
-mask = (volume > avg_volume).cast(pl.Float64)
+mask = Alpha(volume) > Alpha(avg_volume)
 
 # Final alpha
-alpha = Alpha(ranked) * Alpha(mask)
+alpha = Alpha(ranked) * mask
 result = alpha.data
 ```
 
@@ -329,4 +331,40 @@ zscore = ops.divide(ops.subtract(close, ma), std)
 
 # Negative zscore = buy signal (mean reversion)
 alpha = ops.rank(-zscore)
+```
+
+## Example: String DSL
+
+```python
+from quantdl.alpha import alpha_eval
+import quantdl.operators as ops
+
+# Using string DSL for GP/RL compatibility
+signal = alpha_eval(
+    "rank(-ts_delta(close, 5))",
+    {"close": close},
+    ops=ops,
+)
+
+print(signal.data)
+```
+
+---
+
+## Test Coverage
+
+**Location**: `tests/test_alpha.py`
+
+| Test | Coverage |
+|------|----------|
+| `test_alpha_arithmetic` | Alpha +, -, *, / |
+| `test_alpha_comparison` | Alpha <, >, ==, etc. |
+| `test_alpha_eval_basic` | Basic expression parsing |
+| `test_alpha_eval_operators` | Operator function calls |
+| `test_alpha_eval_clean_syntax` | GP/RL-friendly syntax |
+| `test_alpha_parse_error` | Error handling |
+
+Run tests:
+```bash
+uv run pytest tests/test_alpha.py -v
 ```

@@ -21,25 +21,33 @@ uv build                    # build package
 src/quantdl/
 ├── client.py           # QuantDLClient: main entry point, orchestrates fetching
 ├── storage/
-│   ├── s3.py           # S3StorageBackend: Polars native scan_parquet, supports local mode
+│   ├── s3.py           # S3StorageBackend: Polars native scan_parquet, request counting
 │   └── cache.py        # DiskCache: LRU disk cache with TTL
 ├── data/
 │   ├── security_master.py  # Symbol→security_id resolution (point-in-time)
 │   └── calendar_master.py  # Trading day lookups
 ├── operators/
-│   ├── time_series.py      # Column-wise: ts_mean, ts_sum, ts_std, ts_delta, ts_delay, ts_corr, ts_regression, etc.
-│   └── cross_sectional.py  # Row-wise: rank, zscore, normalize, scale, quantile, winsorize
+│   ├── time_series.py      # Column-wise: ts_mean, ts_sum, ts_std, ts_delta, ts_delay, etc.
+│   ├── cross_sectional.py  # Row-wise: rank, zscore, normalize, scale, quantile, winsorize
+│   ├── arithmetic.py       # Element-wise: add, multiply, power, log, etc.
+│   ├── logical.py          # Comparisons: lt, gt, eq, if_else, is_nan
+│   ├── group.py            # Group ops: group_rank, group_zscore, group_neutralize
+│   └── vector.py           # Vector ops: vec_avg, vec_sum
+├── alpha/
+│   ├── core.py             # Alpha class with operator overloading
+│   └── parser.py           # alpha_eval() string DSL for GP/RL
 ├── types.py            # SecurityInfo dataclass
 └── exceptions.py       # Custom exceptions
 ```
 
-**Data flow**: `QuantDLClient.daily()` → resolve symbols via SecurityMaster → fetch parquet from S3 (or cache) → pivot long→wide → align to trading calendar → return DataFrame
+**Data flow**: `QuantDLClient.ticks()` → resolve symbols via SecurityMaster → fetch parquet from S3 (or cache) → pivot long→wide → align to trading calendar → return DataFrame
 
 **Wide table format**: All operators expect/return DataFrames with timestamp as first column, symbols as remaining columns. Time-series ops work column-wise, cross-sectional ops work row-wise. Output rows are aligned to trading days from CalendarMaster.
 
 **S3 bucket structure** (us-equity-datalake):
 - `data/raw/ticks/daily/{security_id}/history.parquet` - OHLCV
-- `data/raw/fundamental/{cik}/fundamental.parquet` - SEC filings
+- `data/raw/fundamental/{cik}/fundamental.parquet` - SEC filings (quarterly)
+- `data/derived/features/fundamental/{cik}/ttm.parquet` - trailing twelve months
 - `data/derived/features/fundamental/{cik}/metrics.parquet` - derived ratios
 - `data/master/security_master.parquet` - symbol↔security_id mapping
 - `data/master/calendar_master.parquet` - trading days

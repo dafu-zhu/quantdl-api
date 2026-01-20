@@ -9,7 +9,7 @@ They detect input types and delegate to built-ins when appropriate.
 """
 
 import builtins
-from collections.abc import Iterable
+from typing import Any
 
 import polars as pl
 
@@ -19,12 +19,12 @@ def _get_value_cols(df: pl.DataFrame) -> list[str]:
     return df.columns[1:]
 
 
-def _has_dataframe(*args) -> bool:
+def _has_dataframe(*args: Any) -> bool:
     """Check if any argument is a DataFrame."""
     return any(isinstance(a, pl.DataFrame) for a in args)
 
 
-def abs(x):
+def abs(x: Any) -> Any:
     """Absolute value - compatible with Python built-in.
 
     Args:
@@ -243,7 +243,7 @@ def log(x: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def max(*args, **kwargs):
+def max(*args: Any, **kwargs: Any) -> Any:
     """Element-wise maximum - compatible with Python built-in.
 
     When called with DataFrames: element-wise max across inputs.
@@ -282,7 +282,7 @@ def max(*args, **kwargs):
     )
 
 
-def min(*args, **kwargs):
+def min(*args: Any, **kwargs: Any) -> Any:
     """Element-wise minimum - compatible with Python built-in.
 
     When called with DataFrames: element-wise min across inputs.

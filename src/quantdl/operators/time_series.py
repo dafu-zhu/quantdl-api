@@ -14,7 +14,7 @@ def _get_value_cols(df: pl.DataFrame) -> list[str]:
 
 
 def ts_mean(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling mean over d periods.
+    """Rolling mean over d periods (partial windows allowed).
 
     Args:
         x: Wide DataFrame with date + symbol columns
@@ -27,12 +27,12 @@ def ts_mean(x: pl.DataFrame, d: int) -> pl.DataFrame:
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_mean(d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_mean(window_size=d, min_samples=1).alias(c) for c in value_cols],
     )
 
 
 def ts_sum(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling sum over d periods.
+    """Rolling sum over d periods (partial windows allowed).
 
     Args:
         x: Wide DataFrame with date + symbol columns
@@ -45,12 +45,12 @@ def ts_sum(x: pl.DataFrame, d: int) -> pl.DataFrame:
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_sum(d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_sum(window_size=d, min_samples=1).alias(c) for c in value_cols],
     )
 
 
 def ts_std(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling standard deviation over d periods.
+    """Rolling standard deviation over d periods (partial windows allowed, min 2 for std).
 
     Args:
         x: Wide DataFrame with date + symbol columns
@@ -63,12 +63,12 @@ def ts_std(x: pl.DataFrame, d: int) -> pl.DataFrame:
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_std(d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_std(window_size=d, min_samples=2).alias(c) for c in value_cols],
     )
 
 
 def ts_min(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling minimum over d periods.
+    """Rolling minimum over d periods (partial windows allowed).
 
     Args:
         x: Wide DataFrame with date + symbol columns
@@ -81,12 +81,12 @@ def ts_min(x: pl.DataFrame, d: int) -> pl.DataFrame:
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_min(d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_min(window_size=d, min_samples=1).alias(c) for c in value_cols],
     )
 
 
 def ts_max(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling maximum over d periods.
+    """Rolling maximum over d periods (partial windows allowed).
 
     Args:
         x: Wide DataFrame with date + symbol columns
@@ -99,40 +99,68 @@ def ts_max(x: pl.DataFrame, d: int) -> pl.DataFrame:
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_max(d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_max(window_size=d, min_samples=1).alias(c) for c in value_cols],
     )
 
 
-def ts_delta(x: pl.DataFrame, d: int = 1) -> pl.DataFrame:
+def ts_delta(
+    x: pl.DataFrame, d: int = 1, lookback: pl.DataFrame | None = None
+) -> pl.DataFrame:
     """Difference from d periods ago: x - ts_delay(x, d).
 
     Args:
         x: Wide DataFrame with date + symbol columns
         d: Lag periods (default: 1)
+        lookback: Optional DataFrame with prior rows to avoid nulls at start.
+                  If provided, uses lookback data for computing initial deltas,
+                  then returns only rows from x.
 
     Returns:
         Wide DataFrame with differenced values
     """
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
+
+    if lookback is not None:
+        # Concatenate lookback + x, compute, then trim to x's rows
+        combined = pl.concat([lookback, x])
+        result = combined.select(
+            pl.col(date_col),
+            *[pl.col(c).diff(d).alias(c) for c in value_cols],
+        )
+        # Return only the rows corresponding to x (last len(x) rows)
+        return result.tail(len(x))
+
     return x.select(
         pl.col(date_col),
         *[pl.col(c).diff(d).alias(c) for c in value_cols],
     )
 
 
-def ts_delay(x: pl.DataFrame, d: int) -> pl.DataFrame:
+def ts_delay(
+    x: pl.DataFrame, d: int, lookback: pl.DataFrame | None = None
+) -> pl.DataFrame:
     """Lag values by d periods.
 
     Args:
         x: Wide DataFrame with date + symbol columns
         d: Number of periods to lag
+        lookback: Optional DataFrame with prior rows to avoid nulls at start.
 
     Returns:
         Wide DataFrame with lagged values
     """
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
+
+    if lookback is not None:
+        combined = pl.concat([lookback, x])
+        result = combined.select(
+            pl.col(date_col),
+            *[pl.col(c).shift(d).alias(c) for c in value_cols],
+        )
+        return result.tail(len(x))
+
     return x.select(
         pl.col(date_col),
         *[pl.col(c).shift(d).alias(c) for c in value_cols],
@@ -143,54 +171,57 @@ def ts_delay(x: pl.DataFrame, d: int) -> pl.DataFrame:
 
 
 def ts_product(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling product over d periods."""
+    """Rolling product over d periods (partial windows allowed)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
         *[
-            pl.col(c).rolling_map(lambda s: s.product(), window_size=d).alias(c)
+            pl.col(c).rolling_map(lambda s: s.product(), window_size=d, min_samples=1).alias(c)
             for c in value_cols
         ],
     )
 
 
 def ts_count_nans(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Count nulls in rolling window of d periods."""
+    """Count nulls in rolling window of d periods (partial windows allowed)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
         *[
-            pl.col(c).is_null().cast(pl.Int64).rolling_sum(d).alias(c)
+            pl.col(c).is_null().cast(pl.Int64).rolling_sum(window_size=d, min_samples=1).alias(c)
             for c in value_cols
         ],
     )
 
 
 def ts_zscore(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Rolling z-score: (x - rolling_mean) / rolling_std."""
-    date_col = x.columns[0]
-    value_cols = _get_value_cols(x)
-    return x.select(
-        pl.col(date_col),
-        *[
-            ((pl.col(c) - pl.col(c).rolling_mean(d)) / pl.col(c).rolling_std(d)).alias(c)
-            for c in value_cols
-        ],
-    )
-
-
-def ts_scale(x: pl.DataFrame, d: int, constant: float = 0) -> pl.DataFrame:
-    """Scale to [constant, 1+constant] based on rolling min/max."""
+    """Rolling z-score: (x - rolling_mean) / rolling_std (partial windows, min 2 for std)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
     return x.select(
         pl.col(date_col),
         *[
             (
-                (pl.col(c) - pl.col(c).rolling_min(d))
-                / (pl.col(c).rolling_max(d) - pl.col(c).rolling_min(d))
+                (pl.col(c) - pl.col(c).rolling_mean(window_size=d, min_samples=1))
+                / pl.col(c).rolling_std(window_size=d, min_samples=2)
+            ).alias(c)
+            for c in value_cols
+        ],
+    )
+
+
+def ts_scale(x: pl.DataFrame, d: int, constant: float = 0) -> pl.DataFrame:
+    """Scale to [constant, 1+constant] based on rolling min/max (partial windows, min 2)."""
+    date_col = x.columns[0]
+    value_cols = _get_value_cols(x)
+    return x.select(
+        pl.col(date_col),
+        *[
+            (
+                (pl.col(c) - pl.col(c).rolling_min(window_size=d, min_samples=2))
+                / (pl.col(c).rolling_max(window_size=d, min_samples=2) - pl.col(c).rolling_min(window_size=d, min_samples=2))
                 + constant
             ).alias(c)
             for c in value_cols
@@ -224,7 +255,7 @@ def ts_step(x: pl.DataFrame) -> pl.DataFrame:
 
 
 def ts_arg_max(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Relative index of max in rolling window (0 = oldest, d-1 = newest)."""
+    """Days since max in rolling window (0 = today is max, d-1 = oldest day was max)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
 
@@ -232,7 +263,10 @@ def ts_arg_max(x: pl.DataFrame, d: int) -> pl.DataFrame:
         if len(s) < d:
             return None
         idx = s.arg_max()
-        return float(idx) if idx is not None else None
+        if idx is None:
+            return None
+        # Convert to "days since": 0 = today (newest), d-1 = oldest
+        return float((d - 1) - idx)
 
     return x.select(
         pl.col(date_col),
@@ -241,7 +275,7 @@ def ts_arg_max(x: pl.DataFrame, d: int) -> pl.DataFrame:
 
 
 def ts_arg_min(x: pl.DataFrame, d: int) -> pl.DataFrame:
-    """Relative index of min in rolling window (0 = oldest, d-1 = newest)."""
+    """Days since min in rolling window (0 = today is min, d-1 = oldest day was min)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
 
@@ -249,7 +283,10 @@ def ts_arg_min(x: pl.DataFrame, d: int) -> pl.DataFrame:
         if len(s) < d:
             return None
         idx = s.arg_min()
-        return float(idx) if idx is not None else None
+        if idx is None:
+            return None
+        # Convert to "days since": 0 = today (newest), d-1 = oldest
+        return float((d - 1) - idx)
 
     return x.select(
         pl.col(date_col),
@@ -398,13 +435,11 @@ def ts_decay_linear(x: pl.DataFrame, d: int, dense: bool = False) -> pl.DataFram
 
 
 def ts_rank(x: pl.DataFrame, d: int, constant: float = 0) -> pl.DataFrame:
-    """Rank of current value in rolling window, scaled to [constant, 1+constant]."""
+    """Rank of current value in rolling window, scaled to [constant, 1+constant] (partial windows allowed)."""
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
 
     def rank_in_window(s: pl.Series) -> float | None:
-        if len(s) < d:
-            return None
         vals = s.to_list()
         current = vals[-1]
         if current is None:
@@ -417,7 +452,7 @@ def ts_rank(x: pl.DataFrame, d: int, constant: float = 0) -> pl.DataFrame:
 
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_map(rank_in_window, window_size=d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_map(rank_in_window, window_size=d, min_samples=1).alias(c) for c in value_cols],
     )
 
 
@@ -486,7 +521,7 @@ def ts_covariance(x: pl.DataFrame, y: pl.DataFrame, d: int) -> pl.DataFrame:
 
 
 def ts_quantile(x: pl.DataFrame, d: int, driver: str = "gaussian") -> pl.DataFrame:
-    """Rolling quantile transform: ts_rank + inverse CDF."""
+    """Rolling quantile transform: ts_rank + inverse CDF (partial windows allowed)."""
     import math
 
     date_col = x.columns[0]
@@ -548,8 +583,6 @@ def ts_quantile(x: pl.DataFrame, d: int, driver: str = "gaussian") -> pl.DataFra
             ) / ((((d_coef[0] * q + d_coef[1]) * q + d_coef[2]) * q + d_coef[3]) * q + 1)
 
     def quantile_transform(s: pl.Series) -> float | None:
-        if len(s) < d:
-            return None
         vals = s.to_list()
         current = vals[-1]
         if current is None:
@@ -566,7 +599,7 @@ def ts_quantile(x: pl.DataFrame, d: int, driver: str = "gaussian") -> pl.DataFra
 
     return x.select(
         pl.col(date_col),
-        *[pl.col(c).rolling_map(quantile_transform, window_size=d).alias(c) for c in value_cols],
+        *[pl.col(c).rolling_map(quantile_transform, window_size=d, min_samples=1).alias(c) for c in value_cols],
     )
 
 
@@ -578,23 +611,39 @@ def ts_regression(
     x: pl.DataFrame,
     d: int,
     lag: int = 0,
-    rettype: int = 0,
+    rettype: int | str = 0,
 ) -> pl.DataFrame:
-    """Rolling OLS regression of y on x.
+    """Rolling OLS regression of y on x (partial windows allowed, min 2 samples).
 
-    rettype:
-        0: residual (y - predicted)
-        1: beta (slope)
-        2: alpha (intercept)
-        3: predicted (alpha + beta * x)
-        4: correlation
-        5: r-squared
-        6: t-stat for beta
-        7: t-stat for alpha
-        8: std error of beta
-        9: std error of alpha
+    rettype (int or str):
+        0 or "resid": residual (y - predicted)
+        1 or "beta": beta (slope)
+        2 or "alpha": alpha (intercept)
+        3 or "predicted": predicted (alpha + beta * x)
+        4 or "corr": correlation
+        5 or "r_squared": r-squared
+        6 or "tstat_beta": t-stat for beta
+        7 or "tstat_alpha": t-stat for alpha
+        8 or "stderr_beta": std error of beta
+        9 or "stderr_alpha": std error of alpha
     """
     import math
+
+    # Map string rettype to int
+    rettype_map = {
+        "resid": 0, "residual": 0,
+        "beta": 1, "slope": 1,
+        "alpha": 2, "intercept": 2,
+        "predicted": 3, "pred": 3,
+        "corr": 4, "correlation": 4,
+        "r_squared": 5, "rsquared": 5, "r2": 5,
+        "tstat_beta": 6,
+        "tstat_alpha": 7,
+        "stderr_beta": 8,
+        "stderr_alpha": 9,
+    }
+    if isinstance(rettype, str):
+        rettype = rettype_map.get(rettype.lower(), 0)
 
     date_col = y.columns[0]
     value_cols = _get_value_cols(y)
@@ -606,18 +655,22 @@ def ts_regression(
         results: list[float | None] = []
 
         for i in range(len(y_vals)):
-            if i < d - 1:
+            # Use available window up to d (partial windows allowed)
+            start_idx = max(0, i - d + 1)
+            y_win_raw = y_vals[start_idx : i + 1]
+            x_win_raw = x_vals[start_idx : i + 1]
+
+            # Filter out pairs where either is null
+            pairs = [(yv, xv) for yv, xv in zip(y_win_raw, x_win_raw, strict=True) if yv is not None and xv is not None]
+
+            # Need at least 2 points for regression
+            if len(pairs) < 2:
                 results.append(None)
                 continue
 
-            y_win = y_vals[i - d + 1 : i + 1]
-            x_win = x_vals[i - d + 1 : i + 1]
-
-            if any(v is None for v in y_win) or any(v is None for v in x_win):
-                results.append(None)
-                continue
-
-            n = d
+            y_win = [p[0] for p in pairs]
+            x_win = [p[1] for p in pairs]
+            n = len(pairs)
             x_mean = sum(x_win) / n
             y_mean = sum(y_win) / n
 
@@ -636,13 +689,19 @@ def ts_regression(
             ss_res = sum(r**2 for r in residuals)
 
             if rettype == 0:  # residual
-                results.append(y_vals[i] - (alpha + beta * x_vals[i]))
+                if y_vals[i] is None or x_vals[i] is None:
+                    results.append(None)
+                else:
+                    results.append(y_vals[i] - (alpha + beta * x_vals[i]))
             elif rettype == 1:  # beta
                 results.append(beta)
             elif rettype == 2:  # alpha
                 results.append(alpha)
             elif rettype == 3:  # predicted
-                results.append(alpha + beta * x_vals[i])
+                if x_vals[i] is None:
+                    results.append(None)
+                else:
+                    results.append(alpha + beta * x_vals[i])
             elif rettype == 4:  # correlation
                 if ss_xx == 0 or ss_yy == 0:
                     results.append(None)

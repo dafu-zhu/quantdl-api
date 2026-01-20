@@ -93,10 +93,6 @@ from quantdl.operators.time_series import (
     ts_sum,
     ts_zscore,
 )
-from quantdl.operators.transformational import (
-    bucket,
-    trade_when,
-)
 from quantdl.operators.vector import vec_avg, vec_sum
 
 __all__ = [
@@ -177,7 +173,4 @@ __all__ = [
     "ge",
     "eq",
     "ne",
-    # Transformational operators
-    "bucket",
-    "trade_when",
 ]

@@ -50,7 +50,10 @@ def rank(x: pl.DataFrame, rate: int = 2) -> pl.DataFrame:
         value_name="value",
     )
 
-    if rate == 0:
+    # Use precise ranking when rate=0 or when dataset is small (< 32 items)
+    # Bucket-based ranking is only beneficial for large universes
+    n_symbols = len(value_cols)
+    if rate == 0 or n_symbols < 32:
         # Precise ranking using ordinal method
         ranked = long.with_columns(
             ((pl.col("value").rank(method="ordinal").over(date_col) - 1)

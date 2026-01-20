@@ -13,15 +13,17 @@ def _get_value_cols(df: pl.DataFrame) -> list[str]:
     return df.columns[1:]
 
 
-def abs(x: pl.DataFrame) -> pl.DataFrame:
+def abs(x: pl.DataFrame | float | int) -> pl.DataFrame | float | int:
     """Absolute value.
 
     Args:
-        x: Wide DataFrame with date + symbol columns
+        x: Scalar or Wide DataFrame with date + symbol columns
 
     Returns:
-        Wide DataFrame with absolute values
+        Scalar or Wide DataFrame with absolute values
     """
+    if isinstance(x, (int, float)):
+        return x if x >= 0 else -x
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
     return x.select(
@@ -92,36 +94,59 @@ def subtract(x: pl.DataFrame, y: pl.DataFrame, filter: bool = False) -> pl.DataF
     )
 
 
-def multiply(*args: pl.DataFrame, filter: bool = False) -> pl.DataFrame:
-    """Element-wise multiplication of two or more DataFrames.
+def multiply(*args: pl.DataFrame | float | int, filter: bool = False) -> pl.DataFrame | float | int:
+    """Element-wise multiplication of two or more values.
 
     Args:
-        *args: Two or more wide DataFrames with matching structure
+        *args: Two or more values (scalars or DataFrames)
         filter: If True, treat NaN as 1
 
     Returns:
-        Wide DataFrame with multiplied values
+        Scalar if all inputs are scalars, otherwise DataFrame
     """
     if len(args) < 2:
         raise ValueError("multiply requires at least 2 inputs")
 
-    date_col = args[0].columns[0]
-    value_cols = _get_value_cols(args[0])
+    # Check if all scalars
+    if all(isinstance(a, (int, float)) for a in args):
+        result = 1
+        for a in args:
+            result *= a
+        return result
 
-    result = args[0]
-    for df in args[1:]:
-        if filter:
+    # Find first DataFrame to get structure
+    first_df = next(a for a in args if isinstance(a, pl.DataFrame))
+    date_col = first_df.columns[0]
+    value_cols = _get_value_cols(first_df)
+
+    # Start with first arg
+    if isinstance(args[0], (int, float)):
+        result = first_df.select(
+            pl.col(date_col),
+            *[pl.lit(args[0]).alias(c) for c in value_cols],
+        )
+    else:
+        result = args[0]
+
+    for arg in args[1:]:
+        if isinstance(arg, (int, float)):
+            # Scalar multiplication
+            result = result.select(
+                pl.col(date_col),
+                *[(pl.col(c) * arg).alias(c) for c in value_cols],
+            )
+        elif filter:
             result = result.select(
                 pl.col(date_col),
                 *[
-                    (pl.col(c).fill_null(1) * df[c].fill_null(1)).alias(c)
+                    (pl.col(c).fill_null(1) * arg[c].fill_null(1)).alias(c)
                     for c in value_cols
                 ],
             )
         else:
             result = result.select(
                 pl.col(date_col),
-                *[(pl.col(c) * df[c]).alias(c) for c in value_cols],
+                *[(pl.col(c) * arg[c]).alias(c) for c in value_cols],
             )
     return result
 
@@ -253,47 +278,70 @@ def min(*args: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def power(x: pl.DataFrame, y: pl.DataFrame) -> pl.DataFrame:
+def power(x: pl.DataFrame | float | int, y: pl.DataFrame | float | int) -> pl.DataFrame | float:
     """Element-wise power: x^y.
 
     Args:
-        x: Wide DataFrame with date + symbol columns (base)
-        y: Wide DataFrame with date + symbol columns (exponent)
+        x: Base - either scalar or DataFrame
+        y: Exponent - either scalar or DataFrame
 
     Returns:
-        Wide DataFrame with x^y values
+        If both scalar: returns scalar x^y
+        Otherwise: Wide DataFrame with x^y values
     """
+    # Case 0: both scalars
+    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+        return x**y
+
+    # Case 1: x is scalar, y is DataFrame
+    if isinstance(x, (int, float)):
+        date_col = y.columns[0]
+        value_cols = _get_value_cols(y)
+        return y.select(
+            pl.col(date_col),
+            *[(pl.lit(x).pow(pl.col(c))).alias(c) for c in value_cols],
+        )
+
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
 
+    # Case 2: x is DataFrame, y is scalar
+    if isinstance(y, (int, float)):
+        return x.select(
+            pl.col(date_col),
+            *[(pl.col(c).pow(y)).alias(c) for c in value_cols],
+        )
+
+    # Case 3: both are DataFrames
     return x.select(
         pl.col(date_col),
         *[(pl.col(c).pow(y[c])).alias(c) for c in value_cols],
     )
 
 
-def signed_power(x: pl.DataFrame, y: pl.DataFrame) -> pl.DataFrame:
+def signed_power(x: pl.DataFrame | float | int, y: pl.DataFrame | float | int) -> pl.DataFrame | float:
     """Signed power: sign(x) * |x|^y.
 
     Preserves sign of x while raising absolute value to power y.
 
     Args:
-        x: Wide DataFrame with date + symbol columns (base)
-        y: Wide DataFrame with date + symbol columns (exponent)
+        x: Base - either scalar or DataFrame
+        y: Exponent - either scalar or DataFrame
 
     Returns:
-        Wide DataFrame with sign(x) * |x|^y values
+        If both scalar: returns scalar sign(x) * |x|^y
+        Otherwise: Wide DataFrame with sign(x) * |x|^y values
     """
-    date_col = x.columns[0]
-    value_cols = _get_value_cols(x)
+    # Both scalars: simple multiplication
+    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+        return sign(x) * power(abs(x), y)
 
-    return x.select(
-        pl.col(date_col),
-        *[
-            (pl.col(c).sign() * pl.col(c).abs().pow(y[c])).alias(c)
-            for c in value_cols
-        ],
-    )
+    # x scalar, y DataFrame: sign(x) is scalar, power returns DataFrame
+    if isinstance(x, (int, float)):
+        return multiply(sign(x), power(abs(x), y))
+
+    # x DataFrame, y scalar or DataFrame: use multiply
+    return multiply(sign(x), power(abs(x), y))
 
 
 def sqrt(x: pl.DataFrame) -> pl.DataFrame:
@@ -322,17 +370,19 @@ def sqrt(x: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def sign(x: pl.DataFrame) -> pl.DataFrame:
+def sign(x: pl.DataFrame | float | int) -> pl.DataFrame | int:
     """Sign function: 1 for positive, -1 for negative, 0 for zero.
 
     Null values remain null.
 
     Args:
-        x: Wide DataFrame with date + symbol columns
+        x: Scalar or Wide DataFrame with date + symbol columns
 
     Returns:
-        Wide DataFrame with sign values (1, -1, 0, or null)
+        Scalar or Wide DataFrame with sign values (1, -1, 0, or null)
     """
+    if isinstance(x, (int, float)):
+        return 1 if x > 0 else -1 if x < 0 else 0
     date_col = x.columns[0]
     value_cols = _get_value_cols(x)
 

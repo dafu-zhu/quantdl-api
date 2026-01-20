@@ -7,7 +7,7 @@ When to use:
 
 Parameters:
     x: Input DataFrame
-    d: Maximum lookback window
+    d: Maximum lookback window (cannot equals 1)
 
 Example output:
     Last different value in discretized signal
@@ -30,7 +30,7 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 discrete_signal = bucket(rank(prices), range_spec="0,1,0.25")
 
 # Find last different value
-last_different = last_diff_value(discrete_signal, 10)
+last_different = last_diff_value(discrete_signal, 3)
 
 print("last_diff_value() - Last different value")
 print("=" * 50)

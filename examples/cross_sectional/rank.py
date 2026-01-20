@@ -7,7 +7,10 @@ When to use:
 
 Parameters:
     x: Input DataFrame
-    rate: Optional power to apply (1.0 = linear, 2.0 = squared)
+    rate: Controls ranking precision (default: 2).
+        rate=0: Precise ordinal ranking
+        rate>0: Bucket-based approximate ranking (for large universes)
+        For small datasets (<32 symbols), always uses precise ranking.
 
 Example output:
     Cross-sectional rank of prices
@@ -36,10 +39,10 @@ print(prices.head(3))
 print("\nCross-sectional rank (0 = lowest, 1 = highest):")
 print(price_rank.head(3))
 
-# Rank with rate parameter (squared ranks emphasize extremes)
-rank_squared = rank(prices, rate=2.0)
-print("\nSquared rank (rate=2.0, emphasizes extremes):")
-print(rank_squared.head(3))
+# Precise ranking with rate=0
+rank_precise = rank(prices, rate=0)
+print("\nPrecise rank (rate=0):")
+print(rank_precise.head(3))
 
 # Cleanup
 client.close()

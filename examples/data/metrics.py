@@ -30,18 +30,18 @@ from quantdl import QuantDLClient
 # Initialize client
 client = QuantDLClient()
 
-# Fetch PE ratio
-print("Fetching PE ratio...")
+# Fetch Gross Profit metric
+print("Fetching Gross Profit...")
 try:
-    pe = client.metrics(
+    grs_pft = client.metrics(
         ["IBM", "JNJ"],
-        metric="pe_ratio",
+        metric="grs_pft",
         start="2022-01-01",
         end="2024-12-31"
     )
-    print(f"\nPE Ratio shape: {pe.shape}")
-    print("\nPE Ratio data:")
-    print(pe.drop_nulls())
+    print(f"\nGross Profit shape: {grs_pft.shape}")
+    print("\nGross Profit data:")
+    print(grs_pft.drop_nulls())
 except Exception as e:
     print(f"\nMetrics not available: {e}")
     print("This is expected if derived metrics haven't been computed yet.")

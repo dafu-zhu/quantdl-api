@@ -29,12 +29,12 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 volume = client.ticks(symbols, field="volume", start="2024-01-01", end="2024-06-30")
 
 # Calculate rolling correlation
-price_vol_corr = ts_corr(prices, volume, 20)
+price_vol_corr = ts_corr(prices, volume, 5)
 
 print("ts_corr() - Rolling correlation")
 print("=" * 50)
 print("\n20-day rolling price-volume correlation:")
-print(price_vol_corr.tail(5))
+print(price_vol_corr.head(10))
 
 # Cleanup
 client.close()

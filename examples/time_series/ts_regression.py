@@ -30,22 +30,22 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 volume = client.ticks(symbols, field="volume", start="2024-01-01", end="2024-06-30")
 
 # Calculate rolling beta (slope)
-beta = ts_regression(prices, volume, 20, rettype="beta")
+beta = ts_regression(prices, volume, 5, rettype="beta")
 
 print("ts_regression() - Rolling OLS regression")
 print("=" * 50)
-print("\n20-day rolling beta (price vs volume):")
-print(beta.tail(5))
+print("\n5-day rolling beta (price vs volume, partial windows min 2):")
+print(beta.head(7))
 
 # Calculate rolling alpha (intercept)
-alpha_reg = ts_regression(prices, volume, 20, rettype="alpha")
-print("\n20-day rolling alpha (intercept):")
-print(alpha_reg.tail(5))
+alpha_reg = ts_regression(prices, volume, 5, rettype="alpha")
+print("\n5-day rolling alpha (intercept):")
+print(alpha_reg.head(7))
 
 # Calculate residual
-resid = ts_regression(prices, volume, 20, rettype="resid")
-print("\n20-day rolling residual (last value):")
-print(resid.tail(5))
+resid = ts_regression(prices, volume, 5, rettype="resid")
+print("\n5-day rolling residual:")
+print(resid.head(7))
 
 # Cleanup
 client.close()

@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate 20-day rolling low
-rolling_low = ts_min(prices, 20)
+rolling_low = ts_min(prices, 5)
 
 print("ts_min() - Rolling minimum")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(5))
 print("\n20-day rolling low:")
-print(rolling_low.tail(5))
+print(rolling_low.head(5))
 
 # Cleanup
 client.close()

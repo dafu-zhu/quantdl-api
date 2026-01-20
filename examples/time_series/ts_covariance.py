@@ -29,12 +29,12 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 volume = client.ticks(symbols, field="volume", start="2024-01-01", end="2024-06-30")
 
 # Calculate rolling covariance
-price_vol_cov = ts_covariance(prices, volume, 20)
+price_vol_cov = ts_covariance(prices, volume, 5)
 
 print("ts_covariance() - Rolling covariance")
 print("=" * 50)
 print("\n20-day rolling price-volume covariance:")
-print(price_vol_cov.tail(5))
+print(price_vol_cov.head(10))
 
 # Cleanup
 client.close()

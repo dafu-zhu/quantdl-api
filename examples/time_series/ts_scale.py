@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate 20-day scaled price
-scaled_price = ts_scale(prices, 20)
+scaled_price = ts_scale(prices, 5)
 
 print("ts_scale() - Rolling min-max scale [0, 1]")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
-print("\n20-day scaled price [0=low, 1=high]:")
-print(scaled_price.tail(5))
+print(prices.head(6))
+print("\n5-day scaled price [0=low, 1=high] (partial windows, min 2):")
+print(scaled_price.head(7))
 
 # Cleanup
 client.close()

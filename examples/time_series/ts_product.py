@@ -45,9 +45,9 @@ cum_return = ts_product(return_factor, 5)
 print("ts_product() - Rolling product")
 print("=" * 50)
 print("\nDaily return factors (1 + return):")
-print(return_factor.tail(5))
+print(return_factor.head(6))
 print("\n5-day cumulative return factor:")
-print(cum_return.tail(5))
+print(cum_return.head(6))
 
 # Cleanup
 client.close()

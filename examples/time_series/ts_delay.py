@@ -32,9 +32,9 @@ prices_5d_ago = ts_delay(prices, 5)
 print("ts_delay() - Lag values by d days")
 print("=" * 50)
 print("\nCurrent prices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\nPrices 5 days ago:")
-print(prices_5d_ago.tail(5))
+print(prices_5d_ago.head(10))
 
 # Cleanup
 client.close()

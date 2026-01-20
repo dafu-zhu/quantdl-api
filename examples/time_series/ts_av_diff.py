@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate deviation from 20-day mean
-price_dev = ts_av_diff(prices, 20)
+price_dev = ts_av_diff(prices, 5)
 
 print("ts_av_diff() - Deviation from rolling mean")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\nDeviation from 20-day mean:")
-print(price_dev.tail(5))
+print(price_dev.head(10))
 
 # Cleanup
 client.close()

@@ -30,7 +30,7 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 momentum = ts_delta(prices, 20)
 
 # Winsorize to +/- 2 std
-winsorized = winsorize(momentum, std=2.0)
+winsorized = winsorize(momentum, std=1.0)
 
 print("winsorize() - Clip to mean +/- n*std")
 print("=" * 50)

@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate 20-day moving average
-ma_20 = ts_mean(prices, 20)
+ma_20 = ts_mean(prices, 5)
 
 print("ts_mean() - Rolling mean")
 print("=" * 50)
 print("\nOriginal prices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\n20-day moving average:")
-print(ma_20.tail(5))
+print(ma_20.head(10))
 
 # Cleanup
 client.close()

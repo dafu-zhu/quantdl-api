@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Find days since rolling low
-days_since_low = ts_arg_min(prices, 20)
+days_since_low = ts_arg_min(prices, 4)
 
 print("ts_arg_min() - Days since window minimum")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(7))
 print("\nDays since 20-day low (0 = today is low):")
-print(days_since_low.tail(5))
+print(days_since_low.head(7))
 
 # Cleanup
 client.close()

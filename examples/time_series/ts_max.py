@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate 20-day rolling high
-rolling_high = ts_max(prices, 20)
+rolling_high = ts_max(prices, 5)
 
 print("ts_max() - Rolling maximum")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\n20-day rolling high:")
-print(rolling_high.tail(5))
+print(rolling_high.head(10))
 
 # Cleanup
 client.close()

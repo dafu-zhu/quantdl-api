@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate percentile rank in window
-percentile = ts_rank(prices, 20)
+percentile = ts_rank(prices, 5)
 
 print("ts_rank() - Percentile rank in window")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\nPercentile rank in 20-day window:")
-print(percentile.tail(5))
+print(percentile.head(10))
 
 # Cleanup
 client.close()

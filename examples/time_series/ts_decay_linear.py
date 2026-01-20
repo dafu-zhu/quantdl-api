@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate linear decay weighted average
-decay_avg = ts_decay_linear(prices, 10)
+decay_avg = ts_decay_linear(prices, 5)
 
 print("ts_decay_linear() - Linear decay weighted average")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\n10-day linear decay weighted average:")
-print(decay_avg.tail(5))
+print(decay_avg.head(10))
 
 # Cleanup
 client.close()

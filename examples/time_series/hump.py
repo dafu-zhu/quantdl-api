@@ -35,9 +35,9 @@ smooth_signal = hump(price_zscore, 0.5)
 print("hump() - Limit change magnitude")
 print("=" * 50)
 print("\nOriginal z-score:")
-print(price_zscore.tail(5))
+print(price_zscore.tail(20))
 print("\nSmoothed z-score (max 0.5 change per period):")
-print(smooth_signal.tail(5))
+print(smooth_signal.tail(20))
 
 # Cleanup
 client.close()

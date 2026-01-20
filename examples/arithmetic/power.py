@@ -7,7 +7,7 @@ When to use:
 
 Parameters:
     x: Base DataFrame
-    y: Exponent DataFrame (must have same shape as x)
+    y: Exponent (scalar or DataFrame)
 
 Example output:
     Prices squared
@@ -15,8 +15,6 @@ Example output:
 from dotenv import load_dotenv
 
 load_dotenv()
-
-import polars as pl
 
 from quantdl import QuantDLClient
 from quantdl.operators import power
@@ -28,20 +26,20 @@ client = QuantDLClient()
 symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
-# Create exponent DataFrame (constant 2.0 for squaring)
-date_col = prices.columns[0]
-value_cols = prices.columns[1:]
-exponent = prices.select(pl.col(date_col), *[pl.lit(2.0).alias(c) for c in value_cols])
+# Compute prices squared (y can be scalar)
+squared = power(prices, 2)
 
-# Compute prices squared
-squared = power(prices, exponent)
+# Compute 0.5^prices (x can be scalar)
+half_power = power(0.5, prices)
 
 print("power() - Element-wise exponentiation (x^y)")
 print("=" * 50)
 print("\nOriginal prices:")
 print(prices.head())
-print("\nPrices squared:")
+print("\nPrices squared - power(prices, 2):")
 print(squared.head())
+print("\n0.5^prices - power(0.5, prices):")
+print(half_power.head())
 
 # Cleanup
 client.close()

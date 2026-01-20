@@ -30,7 +30,7 @@ prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-3
 daily_change = ts_delta(prices, 1)
 
 # Count NaN in rolling window
-nan_count = ts_count_nans(daily_change, 10)
+nan_count = ts_count_nans(daily_change, 5)
 
 print("ts_count_nans() - Count nulls in window")
 print("=" * 50)

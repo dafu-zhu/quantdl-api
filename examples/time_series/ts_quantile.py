@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Calculate Gaussian quantile transform
-gaussian_rank = ts_quantile(prices, 20)
+gaussian_rank = ts_quantile(prices, 5)
 
 print("ts_quantile() - Gaussian quantile transform")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(10))
 print("\nGaussian quantile transform:")
-print(gaussian_rank.tail(5))
+print(gaussian_rank.head(10))
 
 # Cleanup
 client.close()

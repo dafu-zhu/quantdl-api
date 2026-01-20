@@ -34,6 +34,8 @@ abs_change = ops_abs(daily_change)
 
 print("abs() - Absolute value")
 print("=" * 50)
+print("\nDaily prices:")
+print(prices.head())
 print("\nOriginal daily change (can be negative):")
 print(daily_change.head())
 print("\nAbsolute daily change (always positive):")

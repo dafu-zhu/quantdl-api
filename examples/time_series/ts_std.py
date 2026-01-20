@@ -31,15 +31,15 @@ daily_change = ts_delta(prices, 1)
 lagged = ts_delay(prices, 1)
 daily_return = divide(daily_change, lagged)
 
-# Calculate 20-day rolling volatility
-volatility = ts_std(daily_return, 20)
+# Calculate 5-day rolling volatility
+volatility = ts_std(daily_return, 5)
 
 print("ts_std() - Rolling standard deviation")
 print("=" * 50)
 print("\nDaily returns:")
-print(daily_return.tail(5))
-print("\n20-day rolling volatility:")
-print(volatility.tail(5))
+print(daily_return.head(7))
+print("\n5-day rolling volatility (partial windows, min 2 for std):")
+print(volatility.head(7))
 
 # Cleanup
 client.close()

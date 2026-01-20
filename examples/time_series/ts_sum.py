@@ -26,15 +26,15 @@ client = QuantDLClient()
 symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 volume = client.ticks(symbols, field="volume", start="2024-01-01", end="2024-06-30")
 
-# Calculate 20-day cumulative volume
-vol_20d = ts_sum(volume, 20)
+# Calculate 5-day cumulative volume
+vol_5d = ts_sum(volume, 5)
 
 print("ts_sum() - Rolling sum")
 print("=" * 50)
 print("\nDaily volume:")
-print(volume.tail(5))
-print("\n20-day cumulative volume:")
-print(vol_20d.tail(5))
+print(volume.head(7))
+print("\n5-day cumulative volume (partial windows allowed):")
+print(vol_5d.head(7))
 
 # Cleanup
 client.close()

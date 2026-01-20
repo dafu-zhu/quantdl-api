@@ -27,14 +27,14 @@ symbols = ["IBM", "TXN", "NOW", "BMY", "LMT"]
 prices = client.ticks(symbols, field="close", start="2024-01-01", end="2024-06-30")
 
 # Find days since rolling high
-days_since_high = ts_arg_max(prices, 20)
+days_since_high = ts_arg_max(prices, 4)
 
 print("ts_arg_max() - Days since window maximum")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(7))
 print("\nDays since 20-day high (0 = today is high):")
-print(days_since_high.tail(5))
+print(days_since_high.head(7))
 
 # Cleanup
 client.close()

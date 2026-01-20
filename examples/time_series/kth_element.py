@@ -33,9 +33,9 @@ third_from_last = kth_element(prices, 5, 3)
 print("kth_element() - Get k-th element in window")
 print("=" * 50)
 print("\nPrices:")
-print(prices.tail(5))
+print(prices.head(5))
 print("\n3rd element in 5-day window:")
-print(third_from_last.tail(5))
+print(third_from_last.head(5))
 
 # Cleanup
 client.close()

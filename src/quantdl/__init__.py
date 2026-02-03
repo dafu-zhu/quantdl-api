@@ -32,7 +32,7 @@ from quantdl.exceptions import (
 )
 from quantdl.types import SecurityInfo, StorageType
 
-__version__ = "0.1.1"
+__version__ = "0.3.0"
 
 __all__ = [
     "QuantDLClient",

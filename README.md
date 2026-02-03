@@ -44,6 +44,7 @@ standardized = zscore(ma_20)      # Cross-sectional z-score
 
 ## Features
 
+- **Flexible Storage**: First-class support for both S3 and local filesystem
 - **Wide Table Format**: Returns DataFrames with dates as rows, symbols as columns
 - **Local Caching**: LRU disk cache with configurable TTL (default 24h, 10GB)
 - **Point-in-Time Resolution**: Handles symbol changes and corporate actions
@@ -55,12 +56,20 @@ standardized = zscore(ma_20)      # Cross-sectional z-score
 ### Client
 
 ```python
+# S3 mode (default) - fetches from S3 with local caching
 client = QuantDLClient(
-    bucket="us-equity-datalake",       # S3 bucket
+    storage_type="s3",                 # "s3" (default) or "local"
+    bucket="us-equity-datalake",       # S3 bucket name
     cache_dir="~/.quantdl/cache",      # Local cache directory
     cache_ttl_seconds=86400,           # Cache TTL (24 hours)
     cache_max_size_bytes=10*1024**3,   # Max cache size (10GB)
     max_concurrency=10,                # Concurrent S3 requests
+)
+
+# Local mode - reads directly from local parquet files (no caching needed)
+client = QuantDLClient(
+    storage_type="local",
+    data_path="/path/to/data",         # Root directory with parquet files
 )
 ```
 

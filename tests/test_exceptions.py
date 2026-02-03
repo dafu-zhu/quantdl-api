@@ -36,7 +36,7 @@ class TestSecurityNotFoundError:
 
 
 class TestS3Error:
-    """Tests for S3Error."""
+    """Tests for S3Error (StorageError alias)."""
 
     def test_s3_error_without_cause(self) -> None:
         """Test S3Error message without cause."""
@@ -44,7 +44,7 @@ class TestS3Error:
         assert exc.operation == "read"
         assert exc.path == "/path/to/file.parquet"
         assert exc.cause is None
-        assert str(exc) == "S3 read failed for: /path/to/file.parquet"
+        assert str(exc) == "Storage read failed for: /path/to/file.parquet"
 
     def test_s3_error_with_cause(self) -> None:
         """Test S3Error message with cause."""
@@ -53,7 +53,7 @@ class TestS3Error:
         assert exc.operation == "scan_parquet"
         assert exc.path == "/data/test.parquet"
         assert exc.cause is cause
-        assert "S3 scan_parquet failed for: /data/test.parquet" in str(exc)
+        assert "Storage scan_parquet failed for: /data/test.parquet" in str(exc)
         assert "connection failed" in str(exc)
 
     def test_s3_error_is_quantdl_error(self) -> None:

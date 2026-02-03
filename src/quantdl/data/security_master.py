@@ -4,8 +4,8 @@ from datetime import date, timedelta
 
 import polars as pl
 
+from quantdl.storage.backend import StorageBackend
 from quantdl.storage.cache import DiskCache
-from quantdl.storage.s3 import S3StorageBackend
 from quantdl.types import SecurityInfo
 
 
@@ -18,7 +18,7 @@ class SecurityMaster:
 
     SECURITY_MASTER_PATH = "data/master/security_master.parquet"
 
-    def __init__(self, storage: S3StorageBackend, cache: DiskCache | None = None) -> None:
+    def __init__(self, storage: StorageBackend, cache: DiskCache | None = None) -> None:
         self._storage = storage
         self._cache = cache
         self._df: pl.DataFrame | None = None

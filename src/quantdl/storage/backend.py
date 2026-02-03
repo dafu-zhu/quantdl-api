@@ -1,4 +1,4 @@
-"""S3 storage backend using Polars native scan_parquet."""
+"""Storage backend using Polars native scan_parquet."""
 
 import json
 import os
@@ -8,7 +8,7 @@ from typing import Any
 
 import polars as pl
 
-from quantdl.exceptions import S3Error
+from quantdl.exceptions import StorageError
 
 # Default path for persisting request counts
 _DEFAULT_COUNTS_PATH = Path.home() / ".quantdl" / "request_counts.json"
@@ -92,12 +92,12 @@ class S3RequestCounter:
         }
 
 
-class S3StorageBackend:
-    """S3 storage backend using Polars' native object_store integration.
+class StorageBackend:
+    """Storage backend using Polars' native object_store integration.
 
-    Can operate in two modes:
+    Supports two first-class storage modes:
     1. S3 mode (default): Reads from S3 using polars' object_store
-    2. Local mode: Reads from local filesystem (for testing)
+    2. Local mode: Reads from local filesystem
     """
 
     def __init__(
@@ -166,7 +166,7 @@ class S3StorageBackend:
                 lf = lf.select(columns)
             return lf
         except Exception as e:
-            raise S3Error("scan_parquet", path, e) from e
+            raise StorageError("scan_parquet", path, e) from e
 
     def read_parquet(
         self,
@@ -191,7 +191,7 @@ class S3StorageBackend:
         try:
             return lf.collect()
         except Exception as e:
-            raise S3Error("read_parquet", path, e) from e
+            raise StorageError("read_parquet", path, e) from e
 
     def exists(self, path: str) -> bool:
         """Check if a path exists.
@@ -204,7 +204,7 @@ class S3StorageBackend:
                 return Path(resolved).exists()
             _ = self.scan_parquet(path).schema
             return True
-        except S3Error:
+        except StorageError:
             return False
 
     @property

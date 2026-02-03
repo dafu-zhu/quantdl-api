@@ -26,17 +26,21 @@ class DataNotFoundError(QuantDLError):
         super().__init__(f"{data_type} data not found for: {identifier}")
 
 
-class S3Error(QuantDLError):
-    """Raised when S3 operations fail."""
+class StorageError(QuantDLError):
+    """Raised when storage operations fail."""
 
     def __init__(self, operation: str, path: str, cause: Exception | None = None) -> None:
         self.operation = operation
         self.path = path
         self.cause = cause
-        msg = f"S3 {operation} failed for: {path}"
+        msg = f"Storage {operation} failed for: {path}"
         if cause:
             msg += f" ({cause})"
         super().__init__(msg)
+
+
+# Backward compatibility alias
+S3Error = StorageError
 
 
 class CacheError(QuantDLError):

@@ -118,6 +118,17 @@ def temp_cache_dir(tmp_path: Any) -> str:
     return str(cache_dir)
 
 
+# Fixture for creating client with new API
+@pytest.fixture
+def client(test_data_dir: Path) -> Any:
+    """Create client with local test data using new API."""
+    from quantdl import QuantDLClient
+    return QuantDLClient(
+        storage_type="local",
+        data_path=str(test_data_dir),
+    )
+
+
 # Legacy fixture for backward compatibility
 @pytest.fixture
 def mock_s3(test_data_dir: Path) -> Generator[Path, None, None]:

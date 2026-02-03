@@ -6,18 +6,18 @@ from pathlib import Path
 import pytest
 
 from quantdl.data.calendar_master import CalendarMaster
+from quantdl.storage.backend import StorageBackend
 from quantdl.storage.cache import DiskCache
-from quantdl.storage.s3 import S3StorageBackend
 
 
 @pytest.fixture
-def storage(test_data_dir: Path) -> S3StorageBackend:
+def storage(test_data_dir: Path) -> StorageBackend:
     """Create storage backend with local test data."""
-    return S3StorageBackend(bucket="us-equity-datalake", local_path=test_data_dir)
+    return StorageBackend(local_path=test_data_dir)
 
 
 @pytest.fixture
-def calendar_master(storage: S3StorageBackend, temp_cache_dir: str) -> CalendarMaster:
+def calendar_master(storage: StorageBackend, temp_cache_dir: str) -> CalendarMaster:
     """Create CalendarMaster with cache."""
     cache = DiskCache(cache_dir=temp_cache_dir)
     return CalendarMaster(storage, cache)
@@ -75,7 +75,7 @@ class TestGetTradingDays:
 class TestCaching:
     """Tests for caching behavior."""
 
-    def test_calendar_caching(self, storage: S3StorageBackend, temp_cache_dir: str) -> None:
+    def test_calendar_caching(self, storage: StorageBackend, temp_cache_dir: str) -> None:
         """Test that calendar data is cached."""
         cache = DiskCache(cache_dir=temp_cache_dir)
         cm = CalendarMaster(storage, cache)
@@ -91,7 +91,7 @@ class TestCaching:
         result = cm.is_trading_day(date(2024, 1, 3))
         assert result is True
 
-    def test_calendar_without_cache(self, storage: S3StorageBackend) -> None:
+    def test_calendar_without_cache(self, storage: StorageBackend) -> None:
         """Test CalendarMaster works without disk cache."""
         cm = CalendarMaster(storage, cache=None)
         result = cm.is_trading_day(date(2024, 1, 2))

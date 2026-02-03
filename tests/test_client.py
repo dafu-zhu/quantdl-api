@@ -9,33 +9,30 @@ from quantdl.exceptions import DataNotFoundError
 
 
 @pytest.fixture
-def client(test_data_dir: Path, temp_cache_dir: str) -> QuantDLClient:
+def client(test_data_dir: Path) -> QuantDLClient:
     """Create client with local test data."""
     return QuantDLClient(
-        bucket="us-equity-datalake",
-        cache_dir=temp_cache_dir,
-        local_data_path=str(test_data_dir),
+        storage_type="local",
+        data_path=str(test_data_dir),
     )
 
 
 class TestClientBasics:
     """Basic client tests."""
 
-    def test_client_creation(self, test_data_dir: Path, temp_cache_dir: str) -> None:
+    def test_client_creation(self, test_data_dir: Path) -> None:
         """Test client can be created."""
         client = QuantDLClient(
-            bucket="us-equity-datalake",
-            cache_dir=temp_cache_dir,
-            local_data_path=str(test_data_dir),
+            storage_type="local",
+            data_path=str(test_data_dir),
         )
         assert client is not None
 
-    def test_client_context_manager(self, test_data_dir: Path, temp_cache_dir: str) -> None:
+    def test_client_context_manager(self, test_data_dir: Path) -> None:
         """Test client as context manager."""
         with QuantDLClient(
-            bucket="us-equity-datalake",
-            cache_dir=temp_cache_dir,
-            local_data_path=str(test_data_dir),
+            storage_type="local",
+            data_path=str(test_data_dir),
         ) as client:
             assert client is not None
 

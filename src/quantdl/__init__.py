@@ -28,19 +28,22 @@ from quantdl.exceptions import (
     QuantDLError,
     S3Error,
     SecurityNotFoundError,
+    StorageError,
 )
-from quantdl.types import SecurityInfo
+from quantdl.types import SecurityInfo, StorageType
 
 __version__ = "0.1.1"
 
 __all__ = [
     "QuantDLClient",
     "SecurityInfo",
+    "StorageType",
     # Exceptions
     "QuantDLError",
     "SecurityNotFoundError",
     "DataNotFoundError",
-    "S3Error",
+    "StorageError",
+    "S3Error",  # Deprecated alias for StorageError
     "CacheError",
     "ConfigurationError",
 ]

@@ -11,10 +11,10 @@ import polars as pl
 
 from quantdl.data.calendar_master import CalendarMaster
 from quantdl.data.security_master import SecurityMaster
-from quantdl.exceptions import DataNotFoundError
+from quantdl.exceptions import ConfigurationError, DataNotFoundError
+from quantdl.storage.backend import StorageBackend
 from quantdl.storage.cache import DiskCache
-from quantdl.storage.s3 import S3StorageBackend
-from quantdl.types import SecurityInfo
+from quantdl.types import SecurityInfo, StorageType
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -58,6 +58,8 @@ class QuantDLClient:
 
     def __init__(
         self,
+        storage_type: StorageType = "s3",
+        data_path: str | None = None,
         bucket: str = "us-equity-datalake",
         cache_dir: str | None = None,
         cache_ttl_seconds: int | None = None,
@@ -66,34 +68,40 @@ class QuantDLClient:
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
         aws_region: str | None = None,
-        local_data_path: str | None = None,
     ) -> None:
         """Initialize QuantDL client.
 
         Args:
-            bucket: S3 bucket name
+            storage_type: Storage backend type ("s3" or "local")
+            data_path: Path to local data directory (required if storage_type="local")
+            bucket: S3 bucket name (used only when storage_type="s3")
             cache_dir: Local cache directory (default: ~/.quantdl/cache)
             cache_ttl_seconds: Cache TTL in seconds (default: 24 hours)
             cache_max_size_bytes: Max cache size in bytes (default: 10GB)
-            max_concurrency: Max concurrent S3 requests (default: 10)
+            max_concurrency: Max concurrent requests (default: 10)
             aws_access_key_id: AWS access key (default: from environment)
             aws_secret_access_key: AWS secret key (default: from environment)
             aws_region: AWS region (default: from environment or us-east-1)
-            local_data_path: Local path for data files (for testing, bypasses S3)
         """
-        self._storage = S3StorageBackend(
-            bucket=bucket,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            aws_region=aws_region,
-            local_path=local_data_path,
-        )
+        if storage_type == "local" and not data_path:
+            raise ConfigurationError("data_path required when storage_type='local'")
 
-        self._cache = DiskCache(
-            cache_dir=cache_dir,
-            ttl_seconds=cache_ttl_seconds,
-            max_size_bytes=cache_max_size_bytes,
-        )
+        # Create storage backend based on type
+        if storage_type == "local":
+            self._storage = StorageBackend(local_path=data_path)
+            self._cache: DiskCache | None = None  # No caching for local mode
+        else:
+            self._storage = StorageBackend(
+                bucket=bucket,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_region=aws_region,
+            )
+            self._cache = DiskCache(
+                cache_dir=cache_dir,
+                ttl_seconds=cache_ttl_seconds,
+                max_size_bytes=cache_max_size_bytes,
+            )
 
         self._security_master = SecurityMaster(self._storage, self._cache)
         self._calendar_master = CalendarMaster(self._storage, self._cache)
@@ -158,13 +166,14 @@ class QuantDLClient:
         path = f"data/raw/ticks/daily/{security_id}/history.parquet"
 
         # Try cache first
-        cached = self._cache.get(path)
-        if cached is not None:
-            return cached.filter(
-                (pl.col("timestamp") >= start) & (pl.col("timestamp") <= end)
-            )
+        if self._cache:
+            cached = self._cache.get(path)
+            if cached is not None:
+                return cached.filter(
+                    (pl.col("timestamp") >= start) & (pl.col("timestamp") <= end)
+                )
 
-        # Fetch from S3
+        # Fetch from storage
         try:
             df = self._storage.read_parquet(path)
             # Cast timestamp to date if it's a string
@@ -175,7 +184,8 @@ class QuantDLClient:
                 (pl.col("timestamp") >= start) & (pl.col("timestamp") <= end)
             )
             # Cache full file for future use
-            self._cache.put(path, df)
+            if self._cache:
+                self._cache.put(path, df)
             return df
         except Exception:
             return None
@@ -297,15 +307,17 @@ class QuantDLClient:
 
         date_filter = pl.col("as_of_date") <= end
 
-        cached = self._cache.get(path)
-        if cached is not None:
-            return cached.filter(date_filter)
+        if self._cache:
+            cached = self._cache.get(path)
+            if cached is not None:
+                return cached.filter(date_filter)
 
         try:
             df = self._storage.read_parquet(path)
             if df.schema["as_of_date"] == pl.String:
                 df = df.with_columns(pl.col("as_of_date").str.to_date())
-            self._cache.put(path, df)
+            if self._cache:
+                self._cache.put(path, df)
             return df.filter(date_filter)
         except Exception:
             return None
@@ -428,15 +440,17 @@ class QuantDLClient:
         path = f"data/derived/features/fundamental/{cik}/metrics.parquet"
         date_filter = pl.col("as_of_date") <= end
 
-        cached = self._cache.get(path)
-        if cached is not None:
-            return cached.filter(date_filter)
+        if self._cache:
+            cached = self._cache.get(path)
+            if cached is not None:
+                return cached.filter(date_filter)
 
         try:
             df = self._storage.read_parquet(path)
             if df.schema["as_of_date"] == pl.String:
                 df = df.with_columns(pl.col("as_of_date").str.to_date())
-            self._cache.put(path, df)
+            if self._cache:
+                self._cache.put(path, df)
             return df.filter(date_filter)
         except Exception:
             return None
@@ -563,24 +577,27 @@ class QuantDLClient:
         """
         path = f"data/universe/{name}.parquet"
 
-        cached = self._cache.get(path)
-        if cached is not None:
-            return cached["symbol"].to_list()
+        if self._cache:
+            cached = self._cache.get(path)
+            if cached is not None:
+                return cached["symbol"].to_list()
 
         try:
             df = self._storage.read_parquet(path)
-            self._cache.put(path, df)
+            if self._cache:
+                self._cache.put(path, df)
             return df["symbol"].to_list()
         except Exception as e:
             raise DataNotFoundError("universe", name) from e
 
     def clear_cache(self) -> None:
         """Clear all cached data."""
-        self._cache.clear()
+        if self._cache:
+            self._cache.clear()
 
     def cache_stats(self) -> dict[str, object]:
         """Get cache statistics."""
-        return self._cache.stats()
+        return self._cache.stats() if self._cache else {}
 
     def request_count(self, period: str = "session") -> int:
         """Get S3 request count.

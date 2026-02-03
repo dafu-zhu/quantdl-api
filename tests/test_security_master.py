@@ -7,18 +7,18 @@ import polars as pl
 import pytest
 
 from quantdl.data.security_master import SecurityMaster
+from quantdl.storage.backend import StorageBackend
 from quantdl.storage.cache import DiskCache
-from quantdl.storage.s3 import S3StorageBackend
 
 
 @pytest.fixture
-def storage(test_data_dir: Path) -> S3StorageBackend:
+def storage(test_data_dir: Path) -> StorageBackend:
     """Create storage backend with local test data."""
-    return S3StorageBackend(bucket="us-equity-datalake", local_path=test_data_dir)
+    return StorageBackend(local_path=test_data_dir)
 
 
 @pytest.fixture
-def security_master(storage: S3StorageBackend, temp_cache_dir: str) -> SecurityMaster:
+def security_master(storage: StorageBackend, temp_cache_dir: str) -> SecurityMaster:
     """Create SecurityMaster with cache."""
     cache = DiskCache(cache_dir=temp_cache_dir)
     return SecurityMaster(storage, cache)
@@ -157,7 +157,7 @@ class TestSymbolChanges:
         security_master_df.write_parquet(sm_path)
 
         # Create fresh security master
-        storage = S3StorageBackend(bucket="us-equity-datalake", local_path=test_data_dir)
+        storage = StorageBackend(local_path=test_data_dir)
         sm = SecurityMaster(storage, DiskCache(cache_dir=temp_cache_dir + "/new"))
 
         # Resolve at different points in time

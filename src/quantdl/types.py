@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Literal
+
+StorageType = Literal["s3", "local"]
 
 
 @dataclass(frozen=True, slots=True)

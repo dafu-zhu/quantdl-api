@@ -362,7 +362,7 @@ class QuantDLClient:
         result = filtered.select(
             pl.col("as_of_date").alias("timestamp"),
             pl.lit(symbol).alias("symbol"),
-            pl.col("value"),
+            pl.col("value").cast(pl.Float64),
         )
         # Deduplicate: take first value per timestamp
         return result.group_by(["timestamp", "symbol"]).agg(pl.col("value").first())
